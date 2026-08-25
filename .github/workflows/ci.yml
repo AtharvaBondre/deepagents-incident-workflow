@@ -1,0 +1,77 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deterministic:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Bootstrap digest-pinned sandbox image
+        run: ./scripts/bootstrap-pinned-images.sh sandbox
+
+      - name: Compile Python sources
+        run: python -m compileall -q scripts tests fixtures verifiers integration
+
+      - name: Validate public surface
+        run: python scripts/check-public-surface.py
+
+      - name: Run controller tests
+        run: ./scripts/run-local.sh test
+
+      - name: Run deterministic retry workflow
+        run: |
+          ./scripts/run-local.sh run \
+            --scenario retry-success \
+            --budget-seconds 120 \
+            --max-attempts 2
+          ./scripts/run-local.sh verify --latest
+
+      - name: Check working tree formatting
+        run: git diff --check
+
+  deepagents-sdk-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+
+      - name: Install the exact optional SDK
+        run: python -m pip install --disable-pip-version-check ".[deepagents]"
+
+      - name: Validate the pinned SDK and bounded tool surface
+        run: |
+          ./scripts/run-local.sh preflight \
+            --require-deepagents \
+            --deepagents-python "$(command -v python)"
+          python scripts/deepagents_sdk_smoke.py
