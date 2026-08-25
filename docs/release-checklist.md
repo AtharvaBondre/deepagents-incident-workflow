@@ -11,7 +11,8 @@
 - [ ] Run `./scripts/run-local.sh test` twice from a clean clone.
 - [ ] Run the event-indexing Docker scenario and `verify --latest`.
 - [ ] Confirm pre-launch cleanup intents exist and no run container, network, or volume remains, including after a simulated controller crash.
-- [ ] Validate the exact Deep Agents SDK version, six-tool contract, write-prefix enforcement, and instrumented no-transport smoke.
+- [ ] Validate the exact Deep Agents SDK version, strict request/result schemas, six-tool contract, write-prefix enforcement, direct graph smoke, and full controller-to-worker no-transport smoke on Python 3.11 and 3.12.
+- [ ] Run pinned Ruff lint and formatting checks.
 - [ ] Review pinned image indexes for supported architectures.
 - [ ] Review dependencies and update `THIRD_PARTY_NOTICES.md`.
 - [ ] Run the pinned-image vulnerability check and review every unexpired exception.

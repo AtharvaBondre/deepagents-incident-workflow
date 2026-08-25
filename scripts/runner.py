@@ -213,6 +213,37 @@ CANDIDATE_PROBE_PATH = PACKAGE_ROOT / "verifiers" / "candidate_probe.py"
 TRUSTED_VERIFIER_COMPLETION = "DAIW_TRUSTED_VERIFIER_COMPLETED:v1"
 DEEPAGENTS_IDENTITY_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/+@-]{0,127}$")
 DEEPAGENTS_INVOCATION_PATTERN = re.compile(r"^[0-9a-f]{32}$")
+DEEPAGENTS_REQUEST_REQUIRED_FIELDS = frozenset(
+    {
+        "schema_version",
+        "run_id",
+        "attempt",
+        "remaining_budget_seconds",
+        "incident",
+        "evidence",
+        "feedback",
+        "policy",
+        "output_contract",
+    }
+)
+DEEPAGENTS_REQUEST_OPTIONAL_FIELDS = frozenset({"diagnosis", "controller_approved_execution_plan"})
+DEEPAGENTS_WORKER_RESULT_FIELDS = frozenset(
+    {
+        "schema_version",
+        "runtime",
+        "runtime_version",
+        "provider_package",
+        "provider_package_version",
+        "profile_plugins_enabled",
+        "model_transport",
+        "network_attempts",
+        "outcome",
+        "invocation_id",
+        "tool_names",
+        "final_response_bytes",
+        "final_response_sha256",
+    }
+)
 RUN_ID_PATTERN = re.compile(r"^[0-9]{8}T[0-9]{6}Z-[0-9a-f]{32}$")
 SUPPORTED_DEEPAGENTS_PROVIDERS = ("anthropic", "google_genai", "ollama", "openai")
 DEEPAGENTS_PROVIDER_PACKAGES = {
@@ -305,8 +336,10 @@ def retain_candidate_patch(run_dir: Path, candidate: Candidate) -> Candidate:
         raise PolicyDenied("candidate patch changed before artifact retention")
     if changed_paths != candidate.record["changed_paths"]:
         raise PolicyDenied("candidate patch paths changed before artifact retention")
-    if Path(os.path.abspath(source_path)) != Path(os.path.abspath(target)):
-        if target.exists() or target.is_symlink():
+    if target.is_symlink():
+        raise PolicyDenied("candidate patch artifact already exists")
+    if source_path.resolve(strict=True) != target.resolve(strict=False):
+        if target.exists():
             raise PolicyDenied("candidate patch artifact already exists")
         target.write_bytes(payload)
     record = {**candidate.record, "patch": target.name}
@@ -1278,6 +1311,7 @@ class DeepAgentsCandidateProvider:
         model: str,
         runtime_python: str = sys.executable,
         max_turns: int = 20,
+        scripted_smoke: bool = False,
     ) -> None:
         if isinstance(model, str) and ":" in model:
             raise ValueError(
@@ -1291,6 +1325,10 @@ class DeepAgentsCandidateProvider:
             raise ValueError(
                 "unsupported Deep Agents provider; use " + ", ".join(SUPPORTED_DEEPAGENTS_PROVIDERS)
             )
+        if not isinstance(scripted_smoke, bool):
+            raise ValueError("Deep Agents scripted-smoke selection must be boolean")
+        if scripted_smoke and (provider != "openai" or model != "scripted-smoke"):
+            raise ValueError("Deep Agents scripted smoke requires openai and scripted-smoke")
         if not 1 <= max_turns <= 20:
             raise ValueError("Deep Agents max turns must be between one and twenty")
         resolved_python = shutil.which(runtime_python)
@@ -1300,6 +1338,7 @@ class DeepAgentsCandidateProvider:
         self.model = model
         self.runtime_python = str(Path(resolved_python).absolute())
         self.max_turns = max_turns
+        self.scripted_smoke = scripted_smoke
 
     def has_candidate(self, attempt: int) -> bool:
         return 1 <= attempt <= MAX_SEMANTIC_ATTEMPTS
@@ -1363,10 +1402,15 @@ class DeepAgentsCandidateProvider:
             "--max-turns",
             str(self.max_turns),
         ]
+        if self.scripted_smoke:
+            invocation.append("--scripted-smoke")
         environment = deepagents_process_environment(
             home_dir=home_dir,
             provider=self.provider,
         )
+        if self.scripted_smoke:
+            for name in ("OPENAI_API_KEY", "OPENAI_ORG_ID", "OPENAI_PROJECT_ID"):
+                environment.pop(name, None)
         started = time.monotonic()
         completed: subprocess.CompletedProcess[str] | None = None
         worker_result: dict[str, Any] | None = None
@@ -1388,6 +1432,8 @@ class DeepAgentsCandidateProvider:
             "shell_enabled": False,
             "langsmith_tracing_enabled": False,
             "profile_plugins_enabled": False,
+            "scripted_smoke": self.scripted_smoke,
+            "model_transport": "scripted-no-transport" if self.scripted_smoke else "provider",
             "fresh_session": True,
             "controller_is_sole_acceptor": True,
             "outcome": "RUNNING",
@@ -1410,23 +1456,14 @@ class DeepAgentsCandidateProvider:
                 raise FlowError(
                     f"Deep Agents worker result is invalid: {type(exc).__name__}"
                 ) from exc
-            expected_worker_fields = {
-                "schema_version",
-                "runtime",
-                "runtime_version",
-                "provider_package",
-                "provider_package_version",
-                "profile_plugins_enabled",
-                "outcome",
-                "invocation_id",
-                "tool_names",
-                "final_response_bytes",
-                "final_response_sha256",
-            }
-            if not isinstance(worker_result, dict) or set(worker_result) != expected_worker_fields:
+            if (
+                not isinstance(worker_result, dict)
+                or set(worker_result) != DEEPAGENTS_WORKER_RESULT_FIELDS
+            ):
                 raise PolicyDenied("Deep Agents worker result fields are invalid")
             if (
-                worker_result["schema_version"] != 1
+                type(worker_result["schema_version"]) is not int
+                or worker_result["schema_version"] != 1
                 or worker_result["runtime"] != "deepagents"
                 or worker_result["runtime_version"] != DEEPAGENTS_SDK_VERSION
                 or worker_result["provider_package"]
@@ -1434,10 +1471,19 @@ class DeepAgentsCandidateProvider:
                 or worker_result["provider_package_version"]
                 != DEEPAGENTS_PROVIDER_PACKAGES[self.provider][1]
                 or worker_result["profile_plugins_enabled"] is not False
+                or worker_result["model_transport"] != execution["model_transport"]
+                or (
+                    self.scripted_smoke
+                    and (
+                        type(worker_result["network_attempts"]) is not int
+                        or worker_result["network_attempts"] != 0
+                    )
+                )
+                or (not self.scripted_smoke and worker_result["network_attempts"] is not None)
                 or worker_result["outcome"] != "completed"
                 or worker_result["invocation_id"] != invocation_id
                 or worker_result["tool_names"] != list(DEEPAGENTS_ALLOWED_FILESYSTEM_TOOLS)
-                or not isinstance(worker_result["final_response_bytes"], int)
+                or type(worker_result["final_response_bytes"]) is not int
                 or not 0 <= worker_result["final_response_bytes"] <= 32 * 1024
                 or not isinstance(worker_result["final_response_sha256"], str)
                 or re.fullmatch(r"[0-9a-f]{64}", worker_result["final_response_sha256"]) is None
@@ -3151,8 +3197,13 @@ def verify_deepagents_real_model_artifacts(
                 issues.append(f"Deep Agents execution {field} is invalid")
         provider = execution.get("provider")
         model = execution.get("model")
+        scripted_smoke = execution.get("scripted_smoke")
+        if not isinstance(scripted_smoke, bool):
+            issues.append("Deep Agents execution scripted-smoke state is invalid")
         if provider not in SUPPORTED_DEEPAGENTS_PROVIDERS:
             issues.append("Deep Agents execution provider is unsupported")
+        if scripted_smoke is True and (provider != "openai" or model != "scripted-smoke"):
+            issues.append("Deep Agents scripted-smoke identity is invalid")
         if isinstance(provider, str) and isinstance(model, str):
             expected_model_hash = hashlib.sha256(f"{provider}:{model}".encode()).hexdigest()
             if execution.get("model_spec_sha256") != expected_model_hash:
@@ -3182,17 +3233,37 @@ def verify_deepagents_real_model_artifacts(
                 issues.append(f"Deep Agents execution {field} must be true")
         worker_result = execution.get("worker_result")
         expected_provider_package = DEEPAGENTS_PROVIDER_PACKAGES.get(provider)
+        expected_transport = "scripted-no-transport" if scripted_smoke is True else "provider"
+        network_attempts = (
+            worker_result.get("network_attempts") if isinstance(worker_result, dict) else None
+        )
+        network_attempts_valid = (
+            type(network_attempts) is int and network_attempts == 0
+            if scripted_smoke is True
+            else network_attempts is None
+        )
+        if execution.get("model_transport") != expected_transport:
+            issues.append("Deep Agents execution model transport is invalid")
         if (
             not isinstance(worker_result, dict)
+            or set(worker_result) != DEEPAGENTS_WORKER_RESULT_FIELDS
+            or type(worker_result.get("schema_version")) is not int
+            or worker_result.get("schema_version") != 1
             or worker_result.get("runtime") != "deepagents"
             or worker_result.get("runtime_version") != DEEPAGENTS_SDK_VERSION
             or expected_provider_package is None
             or worker_result.get("provider_package") != expected_provider_package[0]
             or worker_result.get("provider_package_version") != expected_provider_package[1]
             or worker_result.get("profile_plugins_enabled") is not False
+            or worker_result.get("model_transport") != expected_transport
+            or not network_attempts_valid
             or worker_result.get("outcome") != "completed"
             or worker_result.get("invocation_id") != invocation_id
             or worker_result.get("tool_names") != list(DEEPAGENTS_ALLOWED_FILESYSTEM_TOOLS)
+            or type(worker_result.get("final_response_bytes")) is not int
+            or not 0 <= worker_result.get("final_response_bytes", -1) <= 32 * 1024
+            or not isinstance(worker_result.get("final_response_sha256"), str)
+            or re.fullmatch(r"[0-9a-f]{64}", worker_result.get("final_response_sha256", "")) is None
         ):
             issues.append("Deep Agents execution worker result is invalid")
         cleanup = execution.get("cleanup")

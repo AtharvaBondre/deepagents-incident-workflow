@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/deepagents-incident-workflow/deepagents-worker-result.schema.json",
+  "title": "Deep Agents worker result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "runtime",
+    "runtime_version",
+    "provider_package",
+    "provider_package_version",
+    "profile_plugins_enabled",
+    "model_transport",
+    "network_attempts",
+    "outcome",
+    "invocation_id",
+    "tool_names",
+    "final_response_bytes",
+    "final_response_sha256"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "runtime": { "const": "deepagents" },
+    "runtime_version": { "const": "0.7.8" },
+    "provider_package": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "provider_package_version": { "type": "string", "minLength": 1, "maxLength": 64 },
+    "profile_plugins_enabled": { "const": false },
+    "model_transport": {
+      "enum": ["provider", "scripted-no-transport"]
+    },
+    "network_attempts": {
+      "type": ["integer", "null"],
+      "minimum": 0,
+      "maximum": 0
+    },
+    "outcome": { "const": "completed" },
+    "invocation_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{32}$"
+    },
+    "tool_names": {
+      "const": ["ls", "read_file", "write_file", "edit_file", "glob", "grep"]
+    },
+    "final_response_bytes": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 32768
+    },
+    "final_response_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}

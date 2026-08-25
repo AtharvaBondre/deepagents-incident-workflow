@@ -26,6 +26,7 @@ Deliverables:
 - LangGraph checkpoint, store, interrupt, replay, fault-tolerance, and streaming analysis.
 - LangSmith open-source/commercial and privacy boundary analysis.
 - Version and license snapshot with observed documentation drift.
+- Pinned comparison with the public Hermes Incident Workflow reference invariants.
 - Architecture decision: direct SDK core; `dcode` compatibility only as a later isolated adapter.
 
 Gate: public evidence supports a precise architecture and all external/version assumptions are written down.
@@ -48,9 +49,11 @@ Deliverables:
 - Clean-workspace reapply and digest check.
 - File-only draft delivery artifacts, exact target linkage, and fail-closed revocation.
 - Durable pre-launch cleanup intents for candidate/verifier containers and Compose projects.
-- No-cost real-SDK smoke with a scripted model.
+- No-cost real-SDK graph smoke and full controller-to-worker subprocess smoke with scripted models.
+- Strict public request/result schemas kept in lockstep with both runtime ends.
 - Optional synthetic PostgreSQL/Kafka/OpenSearch scenario.
 - Public-surface, unit, workflow, verifier, and formatting checks.
+- Maintainer-facing Hermes parity matrix and continuation handoff.
 
 Gate:
 
@@ -63,6 +66,7 @@ Gate:
 ./scripts/run-local.sh verify --latest
 ./scripts/install-deepagents-runtime.sh
 .deepagents-runtime/bin/python scripts/deepagents_sdk_smoke.py
+.deepagents-runtime/bin/python scripts/deepagents_e2e_smoke.py --python .deepagents-runtime/bin/python
 python3 scripts/check-public-surface.py
 git diff --check
 ```

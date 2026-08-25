@@ -21,15 +21,28 @@ It intentionally does not include live production connectors.
 
 ## Near-term work
 
-- Add a packaged customer-pack loader that can point at a private pack path.
+- Generate complete cross-platform transitive dependency locks for the supported
+  Python versions without vendoring packages.
+- Add package provenance and license policy checks, then qualify an exact
+  upstream source tag or commit alongside each package pin.
+- Run the SDK construction smoke inside an OS network-disabled CI boundary.
+- Define controlled upstream release/default-drift review and rollback criteria.
+- Keep dependency-update PR automation disabled until a maintainer explicitly
+  authorizes and owns that workflow.
+- Add Linux AMD64 qualification from a clean public clone.
+
+## Later gated work
+
+- Add a packaged customer-pack loader only after the explicit private-pack
+  selection and schema boundary is implemented.
 - Add connector interfaces for log evidence, database evidence, source-control
-  delivery, and notification delivery.
+  delivery, and notification delivery only after fixture-first threat tests.
 - Add more synthetic scenarios for API regressions, background jobs, migrations,
   and test-failure repair.
 - Add a repeated real-model qualification script that records pass rate, retry
   behavior, runtime, cleanup, and worker-output contract quality.
-- Add signed or externally stored attestations for retained run evidence.
-- Add Linux AMD64 qualification from a clean public clone.
+- Add signed or externally stored attestations only when immutable retention is
+  an explicit requirement.
 
 ## Connector roadmap
 

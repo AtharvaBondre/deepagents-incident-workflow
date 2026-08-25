@@ -34,12 +34,14 @@ The fixture provider applies reviewed patches through the same candidate contrac
 2. copies that attempt into a second disposable SDK workspace;
 3. initializes a shadow Git repository outside the candidate-visible tree;
 4. gives a fresh worker an ephemeral home;
-5. starts `deepagents==0.7.8` with no checkpointer, store, memory, skills, or subagents;
-6. exposes only `ls`, `read_file`, `write_file`, `edit_file`, `glob`, and `grep` through `FilesystemBackend(virtual_mode=True)`;
-7. applies explicit write-prefix permissions followed by default-deny rules;
-8. starts the worker in an isolated process group and terminates that group on timeout;
-9. ignores model success claims and derives the patch from the shadow Git baseline;
-10. deletes the worker directory before writing final execution evidence.
+5. sends a size-bounded, strict-field request described by `schemas/deepagents-request.schema.json`;
+6. starts `deepagents==0.7.8` with no checkpointer, store, memory, skills, or subagents;
+7. exposes only `ls`, `read_file`, `write_file`, `edit_file`, `glob`, and `grep` through `FilesystemBackend(virtual_mode=True)`;
+8. applies explicit write-prefix permissions followed by default-deny rules;
+9. starts the worker in an isolated process group and terminates that group on timeout;
+10. requires an exact-field completion record described by `schemas/deepagents-worker-result.schema.json`;
+11. ignores model success claims and derives the patch from the shadow Git baseline;
+12. deletes the worker directory before writing final execution evidence.
 
 The host process may contact only the explicitly selected model provider. Only provider-specific credential names are forwarded; ambient base-URL and local-host overrides are stripped. Third-party Deep Agents profile entry points are rejected before profile bootstrap. The candidate cannot execute repository code or make tool-driven network calls.
 

@@ -17,6 +17,12 @@ assert SPEC and SPEC.loader
 runner = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(runner)
 
+WORKER_PATH = Path(__file__).resolve().parents[1] / "scripts" / "deepagents_worker.py"
+WORKER_SPEC = importlib.util.spec_from_file_location("daiw_contract_worker", WORKER_PATH)
+assert WORKER_SPEC and WORKER_SPEC.loader
+worker = importlib.util.module_from_spec(WORKER_SPEC)
+WORKER_SPEC.loader.exec_module(worker)
+
 
 def worker_result(invocation_id: str, **changes: object) -> dict:
     value = {
@@ -26,6 +32,8 @@ def worker_result(invocation_id: str, **changes: object) -> dict:
         "provider_package": "langchain-openai",
         "provider_package_version": "1.6.0",
         "profile_plugins_enabled": False,
+        "model_transport": "provider",
+        "network_attempts": None,
         "outcome": "completed",
         "invocation_id": invocation_id,
         "tool_names": list(runner.DEEPAGENTS_ALLOWED_FILESYSTEM_TOOLS),
@@ -162,6 +170,8 @@ class DeepAgentsCandidateProviderTests(unittest.TestCase):
                 "shell_enabled": False,
                 "langsmith_tracing_enabled": False,
                 "profile_plugins_enabled": False,
+                "scripted_smoke": False,
+                "model_transport": "provider",
                 "fresh_session": True,
                 "controller_is_sole_acceptor": True,
                 "worker_result": worker_result(invocation_id),
@@ -259,6 +269,71 @@ class DeepAgentsCandidateProviderTests(unittest.TestCase):
         self.assertNotIn("synthetic-sensitive-value", serialized)
         self.assertEqual(packet["policy"]["allowed_paths"], list(runner.ALLOWED_PATCH_PREFIXES))
 
+    def test_public_worker_schemas_match_both_runtime_ends(self) -> None:
+        request_schema = runner.read_json(
+            runner.PACKAGE_ROOT / "schemas" / "deepagents-request.schema.json"
+        )
+        result_schema = runner.read_json(
+            runner.PACKAGE_ROOT / "schemas" / "deepagents-worker-result.schema.json"
+        )
+
+        self.assertIs(request_schema["additionalProperties"], False)
+        self.assertEqual(
+            set(request_schema["required"]),
+            runner.DEEPAGENTS_REQUEST_REQUIRED_FIELDS,
+        )
+        self.assertEqual(
+            set(request_schema["properties"]),
+            runner.DEEPAGENTS_REQUEST_REQUIRED_FIELDS | runner.DEEPAGENTS_REQUEST_OPTIONAL_FIELDS,
+        )
+        self.assertEqual(
+            worker.REQUEST_REQUIRED_FIELDS,
+            runner.DEEPAGENTS_REQUEST_REQUIRED_FIELDS,
+        )
+        self.assertEqual(
+            worker.REQUEST_OPTIONAL_FIELDS,
+            runner.DEEPAGENTS_REQUEST_OPTIONAL_FIELDS,
+        )
+
+        self.assertIs(result_schema["additionalProperties"], False)
+        self.assertEqual(
+            set(result_schema["required"]),
+            runner.DEEPAGENTS_WORKER_RESULT_FIELDS,
+        )
+        self.assertEqual(
+            set(result_schema["properties"]),
+            runner.DEEPAGENTS_WORKER_RESULT_FIELDS,
+        )
+        self.assertEqual(worker.WORKER_RESULT_FIELDS, runner.DEEPAGENTS_WORKER_RESULT_FIELDS)
+
+    def test_worker_rejects_missing_or_extra_request_fields(self) -> None:
+        incident = runner.read_json(runner.FIXTURES / "incidents" / "retry-success.json")
+        packet = runner.build_deepagents_request(
+            run_id="strict-request-contract",
+            attempt=1,
+            incident=incident,
+            evidence=runner.collect_evidence(incident),
+            feedback=[],
+            deadline=time.monotonic() + 30,
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            request_path = Path(temporary) / "request.json"
+            runner.write_json(request_path, packet)
+            self.assertEqual(worker._load_request(request_path), packet)
+
+            for label, invalid in (
+                ("missing", {key: value for key, value in packet.items() if key != "policy"}),
+                ("extra", {**packet, "untrusted_success": True}),
+            ):
+                with self.subTest(label=label):
+                    runner.write_json(request_path, invalid)
+                    with self.assertRaisesRegex(ValueError, "request fields are invalid"):
+                        worker._load_request(request_path)
+
+            runner.write_json(request_path, {**packet, "schema_version": True})
+            with self.assertRaisesRegex(ValueError, "request schema is invalid"):
+                worker._load_request(request_path)
+
     def test_execution_plan_is_bound_to_incident_test_and_path_policy(self) -> None:
         incident = runner.read_json(runner.FIXTURES / "incidents" / "event-indexing-collision.json")
         evidence = runner.read_json(runner.FIXTURES / "evidence" / "event-indexing-collision.json")
@@ -347,6 +422,21 @@ class DeepAgentsCandidateProviderTests(unittest.TestCase):
                 model="llama3.2:latest",
                 runtime_python=sys.executable,
             )
+
+    def test_scripted_smoke_requires_exact_identity(self) -> None:
+        for provider, model in (
+            ("anthropic", "scripted-smoke"),
+            ("openai", "another-model"),
+        ):
+            with (
+                self.subTest(provider=provider, model=model),
+                self.assertRaisesRegex(ValueError, "scripted smoke requires"),
+            ):
+                runner.DeepAgentsCandidateProvider(
+                    provider=provider,
+                    model=model,
+                    scripted_smoke=True,
+                )
 
     def test_patch_and_workspace_policy_reject_unsafe_candidates(self) -> None:
         mode_change = (
@@ -445,6 +535,117 @@ class DeepAgentsCandidateProviderTests(unittest.TestCase):
             self.assertEqual(command[1], "-I")
             self.assertEqual(command[command.index("--model") + 1], "openai:example-model")
             self.assertNotIn("dcode", command)
+            self.assertNotIn("--scripted-smoke", command)
+
+    def test_scripted_smoke_invocation_strips_provider_credentials(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            artifact_dir = Path(temporary) / "run"
+            artifact_dir.mkdir()
+            workspace = runner.create_workspace(artifact_dir, "attempt-1")
+            provider = runner.DeepAgentsCandidateProvider(
+                provider="openai",
+                model="scripted-smoke",
+                runtime_python=sys.executable,
+                scripted_smoke=True,
+            )
+            observed: dict[str, object] = {}
+
+            def invoke(args, *, cwd, environment, timeout):
+                del cwd, timeout
+                observed["args"] = args
+                observed["environment"] = environment
+                sandbox = Path(args[args.index("--workspace") + 1])
+                result_path = Path(args[args.index("--result") + 1])
+                invocation_id = args[args.index("--invocation-id") + 1]
+                target = sandbox / "app" / "subject.py"
+                target.write_text(
+                    target.read_text(encoding="utf-8").replace(
+                        "return value.strip()",
+                        'return " ".join(value.split()).lower()',
+                    ),
+                    encoding="utf-8",
+                )
+                runner.write_json(
+                    result_path,
+                    worker_result(
+                        invocation_id,
+                        model_transport="scripted-no-transport",
+                        network_attempts=0,
+                    ),
+                )
+                return subprocess.CompletedProcess(args, 0, "", "")
+
+            with (
+                mock.patch.dict(
+                    os.environ,
+                    {
+                        "OPENAI_API_KEY": "must-not-forward",
+                        "OPENAI_ORG_ID": "must-not-forward",
+                        "OPENAI_PROJECT_ID": "must-not-forward",
+                    },
+                    clear=False,
+                ),
+                mock.patch.object(runner, "run_deepagents_process", side_effect=invoke),
+            ):
+                candidate = provider.create_candidate(
+                    attempt=1,
+                    workspace=workspace,
+                    deadline=time.monotonic() + 30,
+                    request=self.fixture_context(artifact_dir),
+                )
+
+            self.assertEqual(candidate.record["changed_paths"], ["app/subject.py"])
+            self.assertIn("--scripted-smoke", observed["args"])
+            for name in ("OPENAI_API_KEY", "OPENAI_ORG_ID", "OPENAI_PROJECT_ID"):
+                self.assertNotIn(name, observed["environment"])
+            execution = runner.read_json(artifact_dir / "attempt-1-deepagents-execution.json")
+            self.assertTrue(execution["scripted_smoke"])
+            self.assertEqual(execution["model_transport"], "scripted-no-transport")
+
+    def test_scripted_smoke_rejects_boolean_network_count(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            artifact_dir = Path(temporary) / "run"
+            artifact_dir.mkdir()
+            workspace = runner.create_workspace(artifact_dir, "attempt-1")
+            provider = runner.DeepAgentsCandidateProvider(
+                provider="openai",
+                model="scripted-smoke",
+                runtime_python=sys.executable,
+                scripted_smoke=True,
+            )
+
+            def invoke(args, **_):
+                sandbox = Path(args[args.index("--workspace") + 1])
+                target = sandbox / "app" / "subject.py"
+                target.write_text(
+                    target.read_text(encoding="utf-8").replace(
+                        "return value.strip()",
+                        'return " ".join(value.split()).lower()',
+                    ),
+                    encoding="utf-8",
+                )
+                result_path = Path(args[args.index("--result") + 1])
+                invocation_id = args[args.index("--invocation-id") + 1]
+                runner.write_json(
+                    result_path,
+                    worker_result(
+                        invocation_id,
+                        model_transport="scripted-no-transport",
+                        network_attempts=False,
+                    ),
+                )
+                return subprocess.CompletedProcess(args, 0, "", "")
+
+            with (
+                mock.patch.object(runner, "run_deepagents_process", side_effect=invoke),
+                self.assertRaisesRegex(runner.PolicyDenied, "runtime contract"),
+            ):
+                provider.create_candidate(
+                    attempt=1,
+                    workspace=workspace,
+                    deadline=time.monotonic() + 30,
+                    request=self.fixture_context(artifact_dir),
+                )
 
     def test_success_claim_without_patch_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -490,6 +691,47 @@ class DeepAgentsCandidateProviderTests(unittest.TestCase):
 
             with mock.patch.object(runner, "run_deepagents_process", side_effect=invoke):
                 with self.assertRaisesRegex(runner.PolicyDenied, "runtime contract"):
+                    provider.create_candidate(
+                        attempt=1,
+                        workspace=workspace,
+                        deadline=time.monotonic() + 30,
+                        request=self.fixture_context(artifact_dir),
+                    )
+
+    def test_worker_result_numeric_fields_reject_booleans(self) -> None:
+        for field in ("schema_version", "final_response_bytes"):
+            with self.subTest(field=field), tempfile.TemporaryDirectory() as temporary:
+                artifact_dir = Path(temporary) / "run"
+                artifact_dir.mkdir()
+                workspace = runner.create_workspace(artifact_dir, "attempt-1")
+                provider = runner.DeepAgentsCandidateProvider(
+                    provider="openai",
+                    model="example-model",
+                    runtime_python=sys.executable,
+                )
+
+                def invoke(args, **_):
+                    sandbox = Path(args[args.index("--workspace") + 1])
+                    target = sandbox / "app" / "subject.py"
+                    target.write_text(
+                        target.read_text(encoding="utf-8").replace(
+                            "return value.strip()",
+                            'return " ".join(value.split()).lower()',
+                        ),
+                        encoding="utf-8",
+                    )
+                    result_path = Path(args[args.index("--result") + 1])
+                    invocation_id = args[args.index("--invocation-id") + 1]
+                    runner.write_json(
+                        result_path,
+                        worker_result(invocation_id, **{field: True}),
+                    )
+                    return subprocess.CompletedProcess(args, 0, "", "")
+
+                with (
+                    mock.patch.object(runner, "run_deepagents_process", side_effect=invoke),
+                    self.assertRaisesRegex(runner.PolicyDenied, "runtime contract"),
+                ):
                     provider.create_candidate(
                         attempt=1,
                         workspace=workspace,
@@ -586,6 +828,62 @@ class DeepAgentsCandidateProviderTests(unittest.TestCase):
         ):
             with self.subTest(expected=expected):
                 self.assertIn(expected, issues)
+
+    def test_real_model_verifier_rejects_worker_contract_extensions(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            run_dir = self.verified_deepagents_run(Path(temporary))
+            execution_path = run_dir / "attempt-1-deepagents-execution.json"
+            execution = runner.read_json(execution_path)
+            execution["worker_result"]["untrusted_success"] = True
+            runner.write_json(execution_path, execution)
+
+            issues = runner.verify_run(run_dir)
+
+        self.assertIn("Deep Agents execution worker result is invalid", issues)
+
+    def test_real_model_verifier_rejects_transport_tampering(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            run_dir = self.verified_deepagents_run(Path(temporary))
+            execution_path = run_dir / "attempt-1-deepagents-execution.json"
+            execution = runner.read_json(execution_path)
+            execution["model_transport"] = "scripted-no-transport"
+            runner.write_json(execution_path, execution)
+
+            issues = runner.verify_run(run_dir)
+
+        self.assertIn("Deep Agents execution model transport is invalid", issues)
+
+    def test_real_model_verifier_rejects_boolean_network_count(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            run_dir = self.verified_deepagents_run(Path(temporary))
+            execution_path = run_dir / "attempt-1-deepagents-execution.json"
+            execution = runner.read_json(execution_path)
+            execution["model"] = "scripted-smoke"
+            execution["model_spec_sha256"] = runner.hashlib.sha256(
+                b"openai:scripted-smoke"
+            ).hexdigest()
+            execution["scripted_smoke"] = True
+            execution["model_transport"] = "scripted-no-transport"
+            execution["worker_result"]["model_transport"] = "scripted-no-transport"
+            execution["worker_result"]["network_attempts"] = False
+            runner.write_json(execution_path, execution)
+
+            issues = runner.verify_run(run_dir)
+
+        self.assertIn("Deep Agents execution worker result is invalid", issues)
+
+    def test_real_model_verifier_rejects_boolean_numeric_fields(self) -> None:
+        for field in ("schema_version", "final_response_bytes"):
+            with self.subTest(field=field), tempfile.TemporaryDirectory() as temporary:
+                run_dir = self.verified_deepagents_run(Path(temporary))
+                execution_path = run_dir / "attempt-1-deepagents-execution.json"
+                execution = runner.read_json(execution_path)
+                execution["worker_result"][field] = True
+                runner.write_json(execution_path, execution)
+
+                issues = runner.verify_run(run_dir)
+
+            self.assertIn("Deep Agents execution worker result is invalid", issues)
 
     def test_cli_exposes_real_provider_without_changing_default(self) -> None:
         default = runner.parser().parse_args(["run"])

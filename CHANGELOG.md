@@ -23,3 +23,12 @@
   every non-successful closeout.
 - Rejected hidden Git rename/copy metadata, reconciled post-apply paths, and
   covered adversarial dictionary-unpack execution in the AST verifier.
+- Added a pinned Hermes reference-parity contract and a complete continuation
+  handoff so future work preserves shared guarantees without coupling runtimes.
+- Added strict public Deep Agents request/result schemas and fail-closed
+  top-level field validation at both ends of the worker boundary.
+- Added a no-cost full controller-to-worker Deep Agents smoke, including patch
+  derivation, Docker verification, clean reapply, draft delivery, and cleanup.
+- Fixed retained-patch identity checks to compare canonical paths, including
+  macOS `/var` and `/private/var` aliases, without weakening collision checks.
+- Expanded CI to run pinned Ruff and both SDK smokes on Python 3.11 and 3.12.

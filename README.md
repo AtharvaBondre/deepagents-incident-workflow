@@ -69,12 +69,30 @@ Rebuild the ignored repository-local runtime from the exact direct dependency pi
 ```bash
 ./scripts/install-deepagents-runtime.sh
 .deepagents-runtime/bin/python scripts/deepagents_sdk_smoke.py
+.deepagents-runtime/bin/python scripts/deepagents_e2e_smoke.py \
+  --python .deepagents-runtime/bin/python
 ./scripts/run-local.sh preflight \
   --require-deepagents \
   --deepagents-python .deepagents-runtime/bin/python
 ```
 
-The smoke uses the real Deep Agents graph, OpenAI/Codex harness-profile path, and filesystem middleware with a scripted local model. It proves the exact six-tool surface, denies an out-of-scope write, performs a permitted read/edit sequence, and confirms that `delete`, `execute`, `task`, and `write_todos` are absent. It sends no paid inference request and fails on observed Python socket or DNS calls; that instrumentation is a regression detector, not an OS network sandbox.
+The first smoke directly exercises the real Deep Agents graph, OpenAI/Codex harness-profile path, and filesystem middleware. The end-to-end smoke then crosses the actual controller, isolated worker subprocess, graph tool loop, shadow-Git patch derivation, pinned Docker tests, trusted verifier, clean reapply, draft delivery, independent verification, and cleanup. Both use scripted local models, send no paid inference request, and fail on observed Python socket or DNS calls; that instrumentation is a regression detector, not an OS network sandbox.
+
+## Policy inspection and cleanup recovery
+
+Inspect the compiled authority boundary before running a candidate:
+
+```bash
+./scripts/run-local.sh dump-policy
+```
+
+If an interrupted run needs recovery, use the controller-owned cleanup path:
+
+```bash
+./scripts/run-local.sh cleanup --latest
+```
+
+Cleanup derives targets from durable controller intents, revalidates exact ownership, and refuses tampered or unrelated resources. Do not delete containers, networks, or volumes by names copied from mutable artifacts.
 
 ## Opt-in real-model attempt
 
@@ -110,6 +128,12 @@ The project therefore integrates the public SDK directly. A future `dcode` compa
 
 See [Deep Agents research](docs/deepagents-research-2026-08-25.md) for the complete documentation inventory, source findings, memory analysis, CLI threat surface, and observed documentation drift.
 
+## Relationship to the Hermes reference
+
+This repository uses the public [Hermes Incident Workflow](https://github.com/AtharvaBondre/hermes-incident-workflow) as its reference product pattern while remaining independently runnable. It preserves the same controller-owned policy, patch, verification, draft-delivery, artifact, and cleanup invariants through Deep Agents-native mechanisms. It does not vendor Hermes or depend on a Hermes installation.
+
+The maintained [Hermes parity matrix](docs/hermes-parity.md) records the pinned comparison baseline, shared guarantees, deliberate runtime differences, verification evidence, and the process for carrying applicable safety improvements between the two public projects.
+
 ## Disposable service example
 
 ```bash
@@ -131,13 +155,17 @@ The accepted candidate must first pass repository tests and the controller-owned
 
 Runs write ignored `artifacts/<run-id>/` directories with control state, redacted evidence, candidate contracts, exact patches, test results, verifier receipts, draft delivery payloads, and closeout records. Artifacts are local audit evidence, not immutable attestations; do not commit them.
 
+The controller-to-worker and worker-to-controller top-level contracts are documented in [`schemas/deepagents-request.schema.json`](schemas/deepagents-request.schema.json) and [`schemas/deepagents-worker-result.schema.json`](schemas/deepagents-worker-result.schema.json). Runtime checks reject missing or extra fields; the schemas do not grant the worker acceptance authority.
+
 Delivery is always file-based and draft-only. The project has no merge, approval, deployment, production-write, or incident-mutation capability.
 
 ## Documentation
 
 - [Architecture](docs/architecture.md)
 - [Deep Agents research](docs/deepagents-research-2026-08-25.md)
+- [Hermes reference parity](docs/hermes-parity.md)
 - [Implementation plan](docs/implementation-plan.md)
+- [Continuation handoff](docs/continuation-handoff-2026-08-25.md)
 - [Threat model](docs/threat-model.md)
 - [Verification](docs/verification.md)
 - [Adapting the workflow](docs/adapting-the-workflow.md)

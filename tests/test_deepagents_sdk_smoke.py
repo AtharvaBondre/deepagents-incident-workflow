@@ -1,4 +1,5 @@
 import importlib.util
+import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -70,6 +71,74 @@ class DeepAgentsSdkSmokeTests(unittest.TestCase):
             model._get_ls_params(),
             {"ls_provider": "openai", "ls_model_name": "gpt-5.2-codex"},
         )
+
+    def test_worker_scripted_model_requires_controller_plan(self) -> None:
+        worker = smoke._load_worker()
+        try:
+            with self.assertRaisesRegex(ValueError, "controller-approved"):
+                worker.build_scripted_smoke_model({"schema_version": 1})
+        except ModuleNotFoundError:
+            self.skipTest("optional Deep Agents runtime is not installed")
+
+    def test_scripted_worker_blocks_network_during_graph_construction(self) -> None:
+        worker = smoke._load_worker()
+        packet = {
+            "schema_version": 1,
+            "run_id": "network-construction-test",
+            "attempt": 1,
+            "remaining_budget_seconds": 30,
+            "incident": {},
+            "evidence": {},
+            "feedback": [],
+            "policy": {
+                "controller_is_sole_acceptor": True,
+                "allowed_paths": ["app/"],
+            },
+            "output_contract": {},
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            workspace = root / "workspace"
+            workspace.mkdir()
+            request_path = root / "request.json"
+            request_path.write_text(worker.json.dumps(packet), encoding="utf-8")
+
+            def construct_with_network_attempt(**_: object) -> object:
+                worker.socket.create_connection(("example.invalid", 443))
+                raise AssertionError("network denial did not stop graph construction")
+
+            def package_version(name: str) -> str:
+                if name == "deepagents":
+                    return worker.EXPECTED_DEEPAGENTS_VERSION
+                return worker.EXPECTED_PROVIDER_PACKAGES["openai"][1]
+
+            with (
+                mock.patch.object(worker, "version", side_effect=package_version),
+                mock.patch.object(worker, "build_scripted_smoke_model", return_value=object()),
+                mock.patch.object(
+                    worker,
+                    "build_bounded_agent",
+                    side_effect=construct_with_network_attempt,
+                ),
+                mock.patch.object(
+                    worker.socket,
+                    "create_connection",
+                    side_effect=AssertionError("network interception was installed too late"),
+                ),
+                self.assertRaisesRegex(
+                    RuntimeError,
+                    "network access is disabled during the scripted worker smoke",
+                ),
+            ):
+                worker.run(
+                    workspace=workspace,
+                    request_path=request_path,
+                    result_path=root / "result.json",
+                    model="openai:scripted-smoke",
+                    invocation_id="a" * 32,
+                    max_turns=4,
+                    scripted_smoke=True,
+                )
 
     def test_third_party_profile_entry_point_is_rejected_before_loading(self) -> None:
         worker = smoke._load_worker()

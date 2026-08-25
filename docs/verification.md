@@ -20,6 +20,8 @@ Version 0.1.0 targets Python 3.11+ for the deterministic controller, `deepagents
 
 ./scripts/install-deepagents-runtime.sh
 .deepagents-runtime/bin/python scripts/deepagents_sdk_smoke.py
+.deepagents-runtime/bin/python scripts/deepagents_e2e_smoke.py \
+  --python .deepagents-runtime/bin/python
 
 python3 scripts/check-public-surface.py
 git diff --check
@@ -46,6 +48,7 @@ The unit suite covers:
 - controller-owned policy and bounded retry feedback;
 - fixture candidate contracts and exact patch digests;
 - Deep Agents request, environment, process, tool, memory, and cleanup boundaries;
+- strict request/result field contracts and public-schema/runtime drift checks;
 - forged or malformed worker completion output;
 - no-patch success claims;
 - SDK process-group timeout termination;
@@ -91,6 +94,21 @@ write_file
 ```
 
 It first proves a write outside the controller path allowlist is denied, then performs a real `read_file` followed by `edit_file`, confirms the edit in a temporary root, exercises the OpenAI/Codex harness-profile path, and verifies `delete`, `execute`, `task`, and `write_todos` are absent. It fails on observed Python socket or DNS calls; this is instrumentation, not an OS-level network boundary.
+
+The end-to-end smoke uses the same pinned SDK with a controller-approved scripted edit and no provider transport. It must cross the real `python -I` worker subprocess, Deep Agents graph/tool loop, shadow-Git diff, candidate contract, pinned Docker tests, trusted verifier receipts, clean reapply, draft delivery, independent `verify_run`, and ownership-checked cleanup. A component-level smoke cannot substitute for this composed proof.
+
+## Qualification snapshot: 2026-08-25
+
+- `./scripts/run-local.sh test`: 100 tests completed successfully; the two optional SDK-import tests skipped under the base interpreter as designed.
+- `.deepagents-runtime/bin/python -m unittest discover -s tests -v`: 100 tests passed with no skips under `deepagents==0.7.8`.
+- Direct SDK smoke: passed with exactly six tools, denied out-of-scope and traversal probes, and zero observed network attempts.
+- Controller-to-worker SDK smoke: `SUCCEEDED` in one attempt with `scripted-no-transport`, trusted verification, exact artifact linkage, and complete cleanup.
+- Deterministic retry workflow: `SUCCEEDED` on attempt two and `verify --latest` reported no issues.
+- Disposable PostgreSQL/Kafka/OpenSearch workflow: `SUCCEEDED` on attempt one, independently verified, and left no matching container, network, or volume.
+- Trivy 0.70.0: all four pinned image finding sets matched the unexpired hash-bound baseline.
+- Public-surface scan: 93 files, zero issues.
+- Ruff 0.12.12 lint and format checks: passed.
+- `git diff --check`: passed.
 
 ## Interpretation
 

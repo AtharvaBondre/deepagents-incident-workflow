@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "issue_id": "DEMO-INC-001",
+  "controller_approved": true,
+  "source": "synthetic-fixture",
+  "edits": [
+    {
+      "path": "app/subject.py",
+      "old_fragment": "return value.strip()",
+      "new_fragment": "return \" \".join(value.split()).lower()"
+    }
+  ],
+  "required_test": "python -m unittest discover -s tests -v"
+}

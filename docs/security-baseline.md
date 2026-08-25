@@ -22,3 +22,8 @@ python3 scripts/check-image-vulnerabilities.py
 
 Refresh an image and requalify the full workflow before changing the baseline.
 Do not extend an exception solely to make CI pass.
+
+Direct Python dependencies are pinned, but a complete transitive lock and
+package-provenance policy remain Phase 2 work. Dependency-update pull requests
+are intentionally manual and disabled by default until a maintainer explicitly
+authorizes the review workflow; CI must not silently widen runtime versions.

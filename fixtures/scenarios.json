@@ -1,6 +1,7 @@
 {
   "retry-success": {
     "incident": "incidents/retry-success.json",
+    "execution_plan": "execution-plans/retry-success.json",
     "controller_verifier": "verifiers/subject_logic.py",
     "allowed_changed_paths": ["app/subject.py"],
     "patches": ["patches/incomplete.patch", "patches/correct.patch"],

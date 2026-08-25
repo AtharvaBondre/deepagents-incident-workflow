@@ -453,6 +453,45 @@ class LocalFlowAcceptanceTests(unittest.TestCase):
                 runner.FIXTURES / "patches/correct.patch",
             )
 
+    def test_retained_patch_accepts_a_canonical_alias_to_the_same_artifact(self) -> None:
+        temporary, root = self.artifact_root()
+        self.addCleanup(temporary.cleanup)
+        real_run_dir = root / "real-run"
+        real_run_dir.mkdir()
+        aliased_run_dir = root / "aliased-run"
+        aliased_run_dir.symlink_to(real_run_dir, target_is_directory=True)
+        patch_path = real_run_dir / "attempt-1-deepagents.patch"
+        patch_path.write_bytes((runner.FIXTURES / "patches/correct.patch").read_bytes())
+        digest_workspace = runner.create_workspace(root, "digest-work")
+        applied = runner.apply_candidate(
+            digest_workspace,
+            patch_path,
+            time.monotonic() + 10,
+        )
+        candidate = runner.Candidate(
+            {
+                "schema_version": runner.CANDIDATE_CONTRACT_VERSION,
+                "source": "deepagents-real-model",
+                "attempt": 1,
+                "patch": patch_path.name,
+                "patch_sha256": runner.hashlib.sha256(patch_path.read_bytes()).hexdigest(),
+                "changed_paths": ["app/subject.py"],
+                "candidate_digest": applied["candidate_digest"],
+            },
+            patch_path,
+        )
+
+        retained = runner.retain_candidate_patch(aliased_run_dir, candidate)
+
+        self.assertEqual(retained.patch_path.resolve(), patch_path.resolve())
+        self.assertEqual(retained.record["patch"], patch_path.name)
+
+        symlink_run_dir = root / "symlink-run"
+        symlink_run_dir.mkdir()
+        (symlink_run_dir / patch_path.name).symlink_to(patch_path)
+        with self.assertRaisesRegex(runner.PolicyDenied, "artifact already exists"):
+            runner.retain_candidate_patch(symlink_run_dir, candidate)
+
     def test_scenario_path_policy_rejects_an_unverified_module(self) -> None:
         scenario = runner.read_json(runner.FIXTURES / "scenarios.json")["event-indexing-collision"]
 

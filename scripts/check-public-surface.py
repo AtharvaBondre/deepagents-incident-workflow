@@ -30,10 +30,15 @@ REQUIRED = {
     "THIRD_PARTY_NOTICES.md",
     "config/workflow.json",
     "docs/deepagents-research-2026-08-25.md",
+    "docs/hermes-parity.md",
     "docs/implementation-plan.md",
+    "docs/continuation-handoff-2026-08-25.md",
+    "schemas/deepagents-request.schema.json",
+    "schemas/deepagents-worker-result.schema.json",
     "schemas/workflow.schema.json",
     "security/image-vulnerability-baseline.json",
     "scripts/check-image-vulnerabilities.py",
+    "scripts/deepagents_e2e_smoke.py",
     "scripts/deepagents_sdk_smoke.py",
     "scripts/deepagents_worker.py",
     "scripts/install-deepagents-runtime.sh",
@@ -165,10 +170,62 @@ def main() -> int:
     except (KeyError, TypeError, json.JSONDecodeError, OSError) as exc:
         issues.append(f"Deep Agents policy/schema consistency check failed: {type(exc).__name__}")
 
+    try:
+        request_schema = json.loads(
+            (ROOT / "schemas" / "deepagents-request.schema.json").read_text()
+        )
+        result_schema = json.loads(
+            (ROOT / "schemas" / "deepagents-worker-result.schema.json").read_text()
+        )
+        expected_request_required = {
+            "schema_version",
+            "run_id",
+            "attempt",
+            "remaining_budget_seconds",
+            "incident",
+            "evidence",
+            "feedback",
+            "policy",
+            "output_contract",
+        }
+        expected_request_optional = {"diagnosis", "controller_approved_execution_plan"}
+        expected_result_fields = {
+            "schema_version",
+            "runtime",
+            "runtime_version",
+            "provider_package",
+            "provider_package_version",
+            "profile_plugins_enabled",
+            "model_transport",
+            "network_attempts",
+            "outcome",
+            "invocation_id",
+            "tool_names",
+            "final_response_bytes",
+            "final_response_sha256",
+        }
+        if request_schema.get("additionalProperties") is not False:
+            issues.append("Deep Agents request schema must reject additional properties")
+        if set(request_schema.get("required", [])) != expected_request_required:
+            issues.append("Deep Agents request schema required fields are out of sync")
+        if set(request_schema.get("properties", {})) != (
+            expected_request_required | expected_request_optional
+        ):
+            issues.append("Deep Agents request schema properties are out of sync")
+        if result_schema.get("additionalProperties") is not False:
+            issues.append("Deep Agents worker-result schema must reject additional properties")
+        if set(result_schema.get("required", [])) != expected_result_fields:
+            issues.append("Deep Agents worker-result schema required fields are out of sync")
+        if set(result_schema.get("properties", {})) != expected_result_fields:
+            issues.append("Deep Agents worker-result schema properties are out of sync")
+    except (TypeError, json.JSONDecodeError, OSError) as exc:
+        issues.append(f"Deep Agents worker schema check failed: {type(exc).__name__}")
+
     for executable in (
         "scripts/run-local.sh",
         "scripts/bootstrap-pinned-images.sh",
         "scripts/install-deepagents-runtime.sh",
+        "scripts/deepagents_e2e_smoke.py",
         "scripts/deepagents_sdk_smoke.py",
         "scripts/deepagents_worker.py",
         "scripts/check-public-surface.py",

@@ -20,6 +20,8 @@ For SDK-facing changes, also run:
 ```bash
 ./scripts/install-deepagents-runtime.sh
 .deepagents-runtime/bin/python scripts/deepagents_sdk_smoke.py
+.deepagents-runtime/bin/python scripts/deepagents_e2e_smoke.py \
+  --python .deepagents-runtime/bin/python
 ./scripts/run-local.sh preflight --require-deepagents --deepagents-python .deepagents-runtime/bin/python
 ```
 
