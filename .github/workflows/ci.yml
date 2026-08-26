@@ -15,6 +15,7 @@ concurrency:
 jobs:
   deterministic:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -42,6 +43,9 @@ jobs:
       - name: Validate public surface
         run: python scripts/check-public-surface.py
 
+      - name: Validate qualified dependency evidence offline
+        run: python -I scripts/dependency_qualification.py
+
       - name: Validate prerequisites and inspect effective policy
         run: |
           ./scripts/run-local.sh preflight
@@ -68,6 +72,7 @@ jobs:
 
   deepagents-sdk-smoke:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -83,8 +88,10 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install the exact optional SDK
-        run: python -m pip install --disable-pip-version-check ".[deepagents]"
+      - name: Install the hash-locked optional SDK
+        env:
+          PYTHON_BIN: python
+        run: ./scripts/install-deepagents-runtime.sh
 
       - name: Bootstrap digest-pinned sandbox image
         run: ./scripts/bootstrap-pinned-images.sh sandbox
@@ -93,6 +100,27 @@ jobs:
         run: |
           ./scripts/run-local.sh preflight \
             --require-deepagents \
-            --deepagents-python "$(command -v python)"
-          python scripts/deepagents_sdk_smoke.py
-          python scripts/deepagents_e2e_smoke.py --python "$(command -v python)"
+            --deepagents-python .deepagents-runtime/bin/python
+          .deepagents-runtime/bin/python scripts/deepagents_sdk_smoke.py
+          .deepagents-runtime/bin/python scripts/deepagents_e2e_smoke.py \
+            --python .deepagents-runtime/bin/python
+
+  network-isolated-sdk-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Set up qualified Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+
+      - name: Bootstrap digest-pinned sandbox image
+        run: ./scripts/bootstrap-pinned-images.sh sandbox
+
+      - name: Build the locked SDK and prove runtime network isolation
+        run: ./scripts/run-network-isolated-sdk-smoke.sh

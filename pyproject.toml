@@ -7,7 +7,7 @@ name = "deepagents-incident-workflow"
 version = "0.1.0"
 description = "A local-first reference workflow for bounded AI incident remediation with Deep Agents"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.11,<3.13"
 license = { file = "LICENSE" }
 authors = [
   { name = "Deep Agents Incident Workflow contributors" }

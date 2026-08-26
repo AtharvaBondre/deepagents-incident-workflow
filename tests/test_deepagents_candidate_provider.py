@@ -407,6 +407,40 @@ class DeepAgentsCandidateProviderTests(unittest.TestCase):
                 home_dir=Path(temporary), provider="untrusted-provider"
             )
 
+    def test_provider_configuration_reports_names_without_values(self) -> None:
+        with mock.patch.dict(
+            os.environ,
+            {
+                "OPENAI_API_KEY": "synthetic-openai-key",
+                "OPENAI_PROJECT_ID": "synthetic-project",
+            },
+            clear=True,
+        ):
+            configuration = runner.deepagents_provider_configuration("openai")
+
+        self.assertTrue(configuration["ready"])
+        self.assertEqual(configuration["missing_environment_names"], [])
+        self.assertEqual(
+            configuration["present_environment_names"],
+            ["OPENAI_API_KEY", "OPENAI_PROJECT_ID"],
+        )
+        self.assertNotIn("synthetic-openai-key", json.dumps(configuration))
+        self.assertFalse(configuration["custom_endpoint_overrides_supported"])
+
+    def test_provider_configuration_reports_a_missing_required_key(self) -> None:
+        with mock.patch.dict(os.environ, {}, clear=True):
+            configuration = runner.deepagents_provider_configuration("anthropic")
+
+        self.assertFalse(configuration["ready"])
+        self.assertEqual(configuration["missing_environment_names"], ["ANTHROPIC_API_KEY"])
+
+    def test_ollama_provider_configuration_requires_no_key(self) -> None:
+        with mock.patch.dict(os.environ, {}, clear=True):
+            configuration = runner.deepagents_provider_configuration("ollama")
+
+        self.assertTrue(configuration["ready"])
+        self.assertEqual(configuration["required_environment_names"], [])
+
     def test_provider_constructor_rejects_unsupported_provider(self) -> None:
         with self.assertRaisesRegex(ValueError, "unsupported Deep Agents provider"):
             runner.DeepAgentsCandidateProvider(
@@ -415,13 +449,13 @@ class DeepAgentsCandidateProviderTests(unittest.TestCase):
                 runtime_python=sys.executable,
             )
 
-    def test_provider_constructor_rejects_colon_in_model_identifier(self) -> None:
-        with self.assertRaisesRegex(ValueError, "must not contain ':'"):
-            runner.DeepAgentsCandidateProvider(
-                provider="ollama",
-                model="llama3.2:latest",
-                runtime_python=sys.executable,
-            )
+    def test_provider_constructor_accepts_ollama_model_tag(self) -> None:
+        provider = runner.DeepAgentsCandidateProvider(
+            provider="ollama",
+            model="llama3.2:latest",
+            runtime_python=sys.executable,
+        )
+        self.assertEqual(provider.model, "llama3.2:latest")
 
     def test_scripted_smoke_requires_exact_identity(self) -> None:
         for provider, model in (
@@ -533,7 +567,8 @@ class DeepAgentsCandidateProviderTests(unittest.TestCase):
             command = observed["args"]
             self.assertEqual(command[0], str(Path(sys.executable).absolute()))
             self.assertEqual(command[1], "-I")
-            self.assertEqual(command[command.index("--model") + 1], "openai:example-model")
+            self.assertEqual(command[command.index("--provider") + 1], "openai")
+            self.assertEqual(command[command.index("--model") + 1], "example-model")
             self.assertNotIn("dcode", command)
             self.assertNotIn("--scripted-smoke", command)
 
@@ -939,6 +974,11 @@ class DeepAgentsCandidateProviderTests(unittest.TestCase):
                 "run_flow",
                 return_value=(Path("/tmp/deepagents-incident-workflow-test-run"), control),
             ),
+            mock.patch.dict(
+                os.environ,
+                {"OPENAI_API_KEY": "synthetic-openai-key"},
+                clear=True,
+            ),
             contextlib.redirect_stdout(io.StringIO()),
         ):
             self.assertEqual(runner.main(), 0)
@@ -948,6 +988,30 @@ class DeepAgentsCandidateProviderTests(unittest.TestCase):
             runtime_python=sys.executable,
             max_turns=20,
         )
+
+    def test_real_model_cli_fails_early_when_provider_key_is_missing(self) -> None:
+        stderr = io.StringIO()
+        with (
+            mock.patch.object(
+                runner.sys,
+                "argv",
+                [
+                    "runner.py",
+                    "run",
+                    "--candidate-provider",
+                    "deepagents",
+                    "--deepagents-provider",
+                    "openai",
+                    "--deepagents-model",
+                    "example-model",
+                ],
+            ),
+            mock.patch.dict(os.environ, {}, clear=True),
+            contextlib.redirect_stderr(stderr),
+        ):
+            self.assertEqual(runner.main(), 2)
+
+        self.assertIn("OPENAI_API_KEY", stderr.getvalue())
 
     def test_real_model_cli_rejects_an_unqualified_interpreter(self) -> None:
         with self.assertRaisesRegex(ValueError, "require .deepagents-runtime"):

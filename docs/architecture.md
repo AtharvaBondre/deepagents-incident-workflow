@@ -83,7 +83,7 @@ Artifacts are ignored local evidence, not immutable attestations. The verifier r
 
 ## LangGraph and memory
 
-Deep Agents runs on LangGraph internally, but Phase 1 intentionally uses no checkpointer or store. Every attempt receives a fresh graph and process.
+Deep Agents runs on LangGraph internally, but the current workflow intentionally uses no checkpointer or store. Every attempt receives a fresh graph and process.
 
 A future resumable controller may use a controller-owned SQLite checkpointer outside the agent mount. Eligibility transitions must use synchronous durability, opaque controller-issued thread IDs, a per-incident lock, and receipt revalidation after resume or replay. Long-term memory remains a separate opt-in feature and can never store policy or verifier authority.
 

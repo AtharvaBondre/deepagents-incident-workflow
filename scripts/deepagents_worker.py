@@ -35,7 +35,8 @@ EXPECTED_PROVIDER_PACKAGES = {
     "openai": ("langchain-openai", "1.6.0"),
 }
 INVOCATION_PATTERN = re.compile(r"^[0-9a-f]{32}$")
-MODEL_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/+@-]{0,255}$")
+PROVIDER_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/+@-]{0,127}$")
+MODEL_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/+@-]{0,255}$")
 REQUEST_REQUIRED_FIELDS = frozenset(
     {
         "schema_version",
@@ -333,6 +334,7 @@ def run(
     workspace: Path,
     request_path: Path,
     result_path: Path,
+    provider: str,
     model: str,
     invocation_id: str,
     max_turns: int,
@@ -340,17 +342,11 @@ def run(
 ) -> None:
     if version("deepagents") != EXPECTED_DEEPAGENTS_VERSION:
         raise RuntimeError(f"deepagents=={EXPECTED_DEEPAGENTS_VERSION} is required")
-    if model.count(":") != 1:
-        raise ValueError("model must be a provider:model identifier")
-    provider, model_identifier = model.split(":", 1)
-    if (
-        MODEL_PATTERN.fullmatch(provider) is None
-        or MODEL_PATTERN.fullmatch(model_identifier) is None
-    ):
+    if PROVIDER_PATTERN.fullmatch(provider) is None or MODEL_PATTERN.fullmatch(model) is None:
         raise ValueError("model provider or identifier is invalid")
     if provider not in EXPECTED_PROVIDER_PACKAGES:
         raise ValueError("model provider is unsupported")
-    if scripted_smoke and model != "openai:scripted-smoke":
+    if scripted_smoke and (provider != "openai" or model != "scripted-smoke"):
         raise ValueError("scripted smoke requires openai:scripted-smoke")
     provider_package, expected_provider_version = EXPECTED_PROVIDER_PACKAGES[provider]
     try:
@@ -396,7 +392,9 @@ def run(
             stack.enter_context(
                 mock.patch.object(socket.socket, "connect", side_effect=deny_network)
             )
-        agent_model = build_scripted_smoke_model(packet) if scripted_smoke else model
+        agent_model = (
+            build_scripted_smoke_model(packet) if scripted_smoke else f"{provider}:{model}"
+        )
         agent = build_bounded_agent(
             model=agent_model,
             profile_key=provider,
@@ -440,6 +438,7 @@ def parser() -> argparse.ArgumentParser:
     value.add_argument("--workspace", type=Path, required=True)
     value.add_argument("--request", type=Path, required=True)
     value.add_argument("--result", type=Path, required=True)
+    value.add_argument("--provider", required=True)
     value.add_argument("--model", required=True)
     value.add_argument("--invocation-id", required=True)
     value.add_argument("--max-turns", type=int, required=True)
@@ -453,6 +452,7 @@ def main() -> int:
         workspace=args.workspace,
         request_path=args.request,
         result_path=args.result,
+        provider=args.provider,
         model=args.model,
         invocation_id=args.invocation_id,
         max_turns=args.max_turns,

@@ -21,6 +21,15 @@ SKIP_PARTS = {
     "dist",
     "build",
 }
+FORBIDDEN_INTERNAL_PATHS = {
+    "docs/implementation-plan.md",
+    "docs/product-roadmap.md",
+}
+FORBIDDEN_INTERNAL_PARTS = {".kybernetes"}
+FORBIDDEN_INTERNAL_NAMES = (
+    re.compile(r"^continuation-handoff(?:-[^.]+)?\.md$"),
+    re.compile(r"^[A-Za-z0-9_-]+-research-[0-9]{4}-[0-9]{2}-[0-9]{2}\.md$"),
+)
 REQUIRED = {
     "README.md",
     "LICENSE",
@@ -28,21 +37,32 @@ REQUIRED = {
     "SECURITY.md",
     "CONTRIBUTING.md",
     "THIRD_PARTY_NOTICES.md",
+    ".github/workflows/upstream-drift.yml",
     "config/workflow.json",
-    "docs/deepagents-research-2026-08-25.md",
+    "docker/deepagents-smoke/Dockerfile",
+    "docs/dependency-qualification.md",
+    "docs/deep-agents-code.md",
+    "docs/deep-agents-integration.md",
     "docs/hermes-parity.md",
-    "docs/implementation-plan.md",
-    "docs/continuation-handoff-2026-08-25.md",
+    "docs/model-setup.md",
     "schemas/deepagents-request.schema.json",
     "schemas/deepagents-worker-result.schema.json",
     "schemas/workflow.schema.json",
+    "requirements/deepagents-py311-universal.lock",
+    "requirements/deepagents-py312-universal.lock",
+    "security/dependency-policy.json",
+    "security/dependency-qualification.json",
     "security/image-vulnerability-baseline.json",
     "scripts/check-image-vulnerabilities.py",
     "scripts/deepagents_e2e_smoke.py",
     "scripts/deepagents_sdk_smoke.py",
     "scripts/deepagents_worker.py",
+    "scripts/dependency_qualification.py",
     "scripts/install-deepagents-runtime.sh",
+    "scripts/refresh-dependency-locks.sh",
+    "scripts/run-network-isolated-sdk-smoke.sh",
     "scripts/runner.py",
+    "scripts/validate_sdk_smoke_record.py",
 }
 SECRET_PATTERNS = (
     re.compile(r"AKIA[0-9A-Z]{16}"),
@@ -98,6 +118,14 @@ def main() -> int:
     present = {path.relative_to(ROOT).as_posix() for path in source_files()}
     for missing in sorted(REQUIRED - present):
         issues.append(f"missing required public file: {missing}")
+    for relative in sorted(present):
+        path = Path(relative)
+        if (
+            relative in FORBIDDEN_INTERNAL_PATHS
+            or any(part in FORBIDDEN_INTERNAL_PARTS for part in path.parts)
+            or any(pattern.fullmatch(path.name) for pattern in FORBIDDEN_INTERNAL_NAMES)
+        ):
+            issues.append(f"internal coordination file is in the public tree: {relative}")
 
     if (ROOT / ".git").exists():
         tracked = subprocess.run(
@@ -228,6 +256,10 @@ def main() -> int:
         "scripts/deepagents_e2e_smoke.py",
         "scripts/deepagents_sdk_smoke.py",
         "scripts/deepagents_worker.py",
+        "scripts/dependency_qualification.py",
+        "scripts/refresh-dependency-locks.sh",
+        "scripts/run-network-isolated-sdk-smoke.sh",
+        "scripts/validate_sdk_smoke_record.py",
         "scripts/check-public-surface.py",
         "scripts/check-image-vulnerabilities.py",
         "integration/postgres-init/001-incident-schema.sh",

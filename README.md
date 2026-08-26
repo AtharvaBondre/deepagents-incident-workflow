@@ -36,13 +36,29 @@ The central rule is: **Deep Agents proposes; the controller decides.** Model tex
 
 ## Requirements
 
-- Python 3.11 or newer
+- Python 3.11 or 3.12
 - Git
 - Docker for candidate verification; Compose for the optional service scenario
-- `deepagents==0.7.8` and the exact provider adapters installed by the
-  `deepagents` extra only for the SDK smoke or a real-model attempt
+- `deepagents==0.7.8` and its provider adapters installed from the qualified
+  transitive hash lock only for the SDK smoke or a real-model attempt
 
 Deep Agents, LangGraph, LangChain, and LangSmith remain external dependencies. Nothing from those projects is vendored here.
+
+## Install
+
+```bash
+git clone https://github.com/AtharvaBondre/deepagents-incident-workflow.git
+cd deepagents-incident-workflow
+./scripts/bootstrap-pinned-images.sh sandbox
+```
+
+The deterministic workflow uses only the Python standard library and Docker; it
+does not require a model key. Install the optional hash-locked Deep Agents
+runtime only when running the SDK smoke or a real-model attempt:
+
+```bash
+./scripts/install-deepagents-runtime.sh
+```
 
 ## Deterministic quick start
 
@@ -64,7 +80,9 @@ The fixture provider deliberately fails the first attempt and succeeds on the se
 
 ## Pinned Deep Agents SDK smoke
 
-Rebuild the ignored repository-local runtime from the exact direct dependency pins and execute a scripted model without a transport call:
+Validate the qualified dependency record, rebuild the ignored repository-local
+runtime from the Python-version-specific transitive hash lock, and execute a
+scripted model without a transport call:
 
 ```bash
 ./scripts/install-deepagents-runtime.sh
@@ -74,9 +92,19 @@ Rebuild the ignored repository-local runtime from the exact direct dependency pi
 ./scripts/run-local.sh preflight \
   --require-deepagents \
   --deepagents-python .deepagents-runtime/bin/python
+./scripts/run-network-isolated-sdk-smoke.sh
 ```
 
 The first smoke directly exercises the real Deep Agents graph, OpenAI/Codex harness-profile path, and filesystem middleware. The end-to-end smoke then crosses the actual controller, isolated worker subprocess, graph tool loop, shadow-Git patch derivation, pinned Docker tests, trusted verifier, clean reapply, draft delivery, independent verification, and cleanup. Both use scripted local models, send no paid inference request, and fail on observed Python socket or DNS calls; that instrumentation is a regression detector, not an OS network sandbox.
+
+The final smoke rebuilds the exact Python 3.12 lock in a digest-pinned image and
+runs the SDK smoke as an unprivileged process with Docker network mode `none`, a
+read-only root, resource limits, a 120-second container-execution deadline,
+per-run ownership labels, and verified cleanup. CI separately bounds the whole
+build-and-run job. The controller retains and strictly validates the smoke
+record through its fresh host-output mount; exit zero or log text alone cannot
+pass. See [Dependency qualification](docs/dependency-qualification.md)
+for provenance, license, drift, upgrade, and rollback controls.
 
 ## Policy inspection and cleanup recovery
 
@@ -96,7 +124,17 @@ Cleanup derives targets from durable controller intents, revalidates exact owner
 
 ## Opt-in real-model attempt
 
-Supply provider authentication only through the ambient runtime environment. The controller forwards only the credential names allowlisted for the selected provider, does not forward endpoint overrides, and gives the worker an ephemeral `HOME`. Real-model CLI runs require the freshly rebuilt repository-local runtime.
+Configure one supported provider as described in [Model provider setup](docs/model-setup.md). The controller forwards only credential names allowlisted for that provider, does not forward endpoint overrides, and gives the worker an ephemeral `HOME`. Real-model runs require the freshly rebuilt repository-local runtime.
+
+Check the complete local setup without making a model request:
+
+```bash
+./scripts/run-local.sh preflight \
+  --with-docker \
+  --require-deepagents \
+  --deepagents-python .deepagents-runtime/bin/python \
+  --deepagents-provider openai
+```
 
 ```bash
 ./scripts/run-local.sh run \
@@ -109,7 +147,7 @@ Supply provider authentication only through the ambient runtime environment. The
   --max-attempts 2
 ```
 
-Supported adapter prefixes are `anthropic`, `google_genai`, `ollama`, and `openai`. The model identifier is a single untagged identifier and may not contain `:`; choose an Ollama alias without a tag separator. A model provider request is the only intended network activity in this mode. The model has no network-capable tool and cannot run repository code. The controller runs tests afterward in its separate network-disabled verifier boundary.
+Supported adapter prefixes are `anthropic`, `google_genai`, `ollama`, and `openai`. A model provider request is the only intended network activity in this mode. The model has no network-capable tool and cannot run repository code. The controller runs tests afterward in its separate network-disabled verifier boundary.
 
 Review a provider's retention and processing terms before using non-synthetic input. Never place credentials in repository files or artifacts.
 
@@ -117,7 +155,10 @@ Review a provider's retention and processing terms before using non-synthetic in
 
 Deep Agents Code (`deepagents-code`, command `dcode`) is a useful interactive coding product, but its headless client/server runtime has a broader trusted surface: project/user instruction discovery, persistent SQLite sessions and memory, hooks, plugins, MCP, `fetch_url`, optional shell access, update paths, and an unauthenticated localhost development server. The documented shell allowlist is not a containment boundary.
 
-The project therefore integrates the public SDK directly. A future `dcode` compatibility lane may be added only behind an outer OS sandbox, an ephemeral home, disabled updates/MCP/hooks/plugins/memory, and the same controller-owned patch and verifier gates. It will not replace the SDK-native core.
+The project therefore integrates the public SDK directly. [Deep Agents Code
+compatibility](docs/deep-agents-code.md) explains the current `dcode==0.1.62`
+limitations and the conditions required before an optional CLI lane could be
+added. It would not replace the SDK-native core.
 
 ## Deep Agents, LangGraph, and LangSmith
 
@@ -126,7 +167,9 @@ The project therefore integrates the public SDK directly. A future `dcode` compa
 - LangSmith tracing, evaluation, deployment, and Agent Server are optional external capabilities. They are disabled and not required for local verification.
 - LLM rubrics and goals may provide advisory feedback, but never delivery authority.
 
-See [Deep Agents research](docs/deepagents-research-2026-08-25.md) for the complete documentation inventory, source findings, memory analysis, CLI threat surface, and observed documentation drift.
+See [Deep Agents integration](docs/deep-agents-integration.md) for the upstream
+architecture used by this project and the capabilities deliberately excluded
+from the authoritative path.
 
 ## Relationship to the Hermes reference
 
@@ -162,15 +205,15 @@ Delivery is always file-based and draft-only. The project has no merge, approval
 ## Documentation
 
 - [Architecture](docs/architecture.md)
-- [Deep Agents research](docs/deepagents-research-2026-08-25.md)
+- [Model provider setup](docs/model-setup.md)
+- [Deep Agents integration](docs/deep-agents-integration.md)
+- [Dependency qualification](docs/dependency-qualification.md)
+- [Deep Agents Code compatibility](docs/deep-agents-code.md)
 - [Hermes reference parity](docs/hermes-parity.md)
-- [Implementation plan](docs/implementation-plan.md)
-- [Continuation handoff](docs/continuation-handoff-2026-08-25.md)
 - [Threat model](docs/threat-model.md)
 - [Verification](docs/verification.md)
 - [Adapting the workflow](docs/adapting-the-workflow.md)
 - [Customer packs](docs/customer-packs.md)
-- [Product roadmap](docs/product-roadmap.md)
 - [Security baseline](docs/security-baseline.md)
 - [Release checklist](docs/release-checklist.md)
 - [Security policy](SECURITY.md)

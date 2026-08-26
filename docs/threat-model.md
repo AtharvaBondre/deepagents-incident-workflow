@@ -59,4 +59,4 @@
 
 ## Explicitly excluded high-risk surfaces
 
-Phase 1 does not enable `LocalShellBackend`, Deep Agents Code, Agent Server, writable memory, MCP, hooks, plugins, remote sandboxes, dynamic/async subagents, QuickJS, web search, `fetch_url`, LangSmith tracing, model-graded delivery gates, live connectors, automatic merge, deployment, or incident mutation.
+The current workflow does not enable `LocalShellBackend`, Deep Agents Code, Agent Server, writable memory, MCP, hooks, plugins, remote sandboxes, dynamic/async subagents, QuickJS, web search, `fetch_url`, LangSmith tracing, model-graded delivery gates, live connectors, automatic merge, deployment, or incident mutation.

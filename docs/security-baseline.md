@@ -1,9 +1,11 @@
 # Container security baseline
 
-All runtime images are pinned by multi-architecture OCI index digest. The
-candidate-test and verifier image had no HIGH or CRITICAL findings when scanned
-with Trivy 0.70.0 on 2026-08-18. Deep Agents runs as an external Python package
-in a fresh host subprocess and does not add an image to this baseline.
+All upstream base and service image inputs are pinned by multi-architecture OCI
+index digest. The candidate-test and verifier image had no HIGH or CRITICAL
+findings when scanned with Trivy 0.70.0 on 2026-08-18. The Deep Agents host
+runtime remains external; the SDK smoke reuses the same qualified Python 3.12
+Alpine base and builds a per-run, nonce-labeled image from the transitive hash
+lock.
 
 The disposable PostgreSQL, Kafka, and OpenSearch images retain upstream
 findings even at the current stable versions used for qualification. They are
@@ -23,7 +25,20 @@ python3 scripts/check-image-vulnerabilities.py
 Refresh an image and requalify the full workflow before changing the baseline.
 Do not extend an exception solely to make CI pass.
 
-Direct Python dependencies are pinned, but a complete transitive lock and
-package-provenance policy remain Phase 2 work. Dependency-update pull requests
-are intentionally manual and disabled by default until a maintainer explicitly
-authorizes the review workflow; CI must not silently widen runtime versions.
+Python 3.11 and 3.12 runtime dependencies are fully version- and hash-locked.
+`security/dependency-qualification.json` binds the lockfiles to official PyPI
+artifacts, normalized license evidence, source tags, scoped source commits, and
+the official documentation inventory. Validate it offline before installation:
+
+```bash
+python3 -I scripts/dependency_qualification.py
+```
+
+The SDK smoke image is built from the qualified hash lock using ordinary build
+network access. The resulting smoke container then runs with Docker network
+mode `none`, a read-only root, an unprivileged UID, resource limits, a
+controller execution deadline, strict controller-side result validation, and
+verified per-run cleanup. Dependency-update pull requests remain manual and
+disabled by default; CI and the scheduled read-only drift job cannot silently
+widen runtime versions. See `docs/dependency-qualification.md` for upgrade and
+rollback rules.

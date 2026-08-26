@@ -43,6 +43,7 @@ Both projects must preserve these invariants:
 | Delivery | File-based draft GitHub and notification mocks | Equivalent mocks with post-eligibility revocation | Matched and strengthened |
 | Cleanup | Controller-owned container and Compose cleanup | Pre-launch intents, exact ownership checks, restart recovery, pre-delivery and closeout cleanup | Strengthened |
 | Public safety | Public-surface scanner and ignored artifacts | Expanded scanner, credential shapes, irregular-file checks, and git-aware ignored-path checks | Matched and strengthened |
+| Dependency integrity | External Hermes CLI version checked at preflight | Python 3.11/3.12 transitive hash locks, PyPI provenance and license evidence, exact upstream tags, scoped source/document drift, and a network-none SDK smoke | Runtime-specific strengthening |
 | CI | Deterministic tests and SDK smoke | Python 3.11/3.12 deterministic and SDK matrices, pinned Ruff, direct graph smoke, and controller-to-worker end-to-end smoke | Matched and strengthened |
 | Customer adaptation | Public templates; private packs remain external | Equivalent customer-neutral templates and boundaries | Matched |
 | Costing | Evidence-backed model-cost guidance | Equivalent formulas and provider-rate structure | Matched |
@@ -65,7 +66,10 @@ Hermes needs a repository-owned profile to constrain CLI behavior. Deep Agents b
 
 ### Memory and LangGraph
 
-Deep Agents exposes native LangGraph checkpoint and store integration. They are disabled in Phase 1. Their availability does not justify enabling them until resume, replay, namespace, poisoning, retention, and concurrency tests meet the gates in the implementation plan.
+Deep Agents exposes native LangGraph checkpoint and store integration. They are
+disabled in the current workflow. Their availability does not justify enabling
+them until a concrete use case defines and tests resume, replay, namespace,
+poisoning, retention, deletion, and concurrency behavior.
 
 ## Parity verification matrix
 
@@ -100,6 +104,6 @@ Do not make CI fetch or execute the Hermes repository. Cross-project review is a
 
 ## Current conclusion
 
-Against the pinned public Hermes baseline, the Deep Agents project has feature parity for the safe synthetic incident-remediation workflow and broader fail-closed verifier, patch-integrity, cleanup-recovery, and public-surface regression coverage. Its remaining gaps are future capability gates shared by both projects or explicit Deep Agents-specific residuals, not missing Phase 1 parity.
+Against the pinned public Hermes baseline, the Deep Agents project has feature parity for the safe synthetic incident-remediation workflow and broader fail-closed verifier, patch-integrity, cleanup-recovery, and public-surface regression coverage. Features outside that bounded workflow remain deliberately unsupported unless their security and operating requirements are separately specified and tested.
 
 The composed no-cost SDK qualification also proves that this conclusion is not based only on unit-level equivalence: an actual Deep Agents graph and worker subprocess can produce a candidate that survives the complete controller-owned acceptance chain without receiving delivery authority.

@@ -211,7 +211,8 @@ CANDIDATE_CONTAINER_PHASES = (
 )
 CANDIDATE_PROBE_PATH = PACKAGE_ROOT / "verifiers" / "candidate_probe.py"
 TRUSTED_VERIFIER_COMPLETION = "DAIW_TRUSTED_VERIFIER_COMPLETED:v1"
-DEEPAGENTS_IDENTITY_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/+@-]{0,127}$")
+DEEPAGENTS_PROVIDER_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/+@-]{0,127}$")
+DEEPAGENTS_MODEL_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/+@-]{0,255}$")
 DEEPAGENTS_INVOCATION_PATTERN = re.compile(r"^[0-9a-f]{32}$")
 DEEPAGENTS_REQUEST_REQUIRED_FIELDS = frozenset(
     {
@@ -246,6 +247,18 @@ DEEPAGENTS_WORKER_RESULT_FIELDS = frozenset(
 )
 RUN_ID_PATTERN = re.compile(r"^[0-9]{8}T[0-9]{6}Z-[0-9a-f]{32}$")
 SUPPORTED_DEEPAGENTS_PROVIDERS = ("anthropic", "google_genai", "ollama", "openai")
+DEEPAGENTS_PROVIDER_REQUIRED_ENVIRONMENT = {
+    "anthropic": ("ANTHROPIC_API_KEY",),
+    "google_genai": ("GOOGLE_API_KEY",),
+    "ollama": (),
+    "openai": ("OPENAI_API_KEY",),
+}
+DEEPAGENTS_PROVIDER_OPTIONAL_ENVIRONMENT = {
+    "anthropic": (),
+    "google_genai": (),
+    "ollama": (),
+    "openai": ("OPENAI_ORG_ID", "OPENAI_PROJECT_ID"),
+}
 DEEPAGENTS_PROVIDER_PACKAGES = {
     "anthropic": ("langchain-anthropic", "1.6.1"),
     "google_genai": ("langchain-google-genai", "4.3.5"),
@@ -1155,17 +1168,7 @@ def deepagents_process_environment(
     provider: str,
 ) -> dict[str, str]:
     """Build a minimal SDK-worker environment with provider-scoped credentials."""
-    provider_environment = {
-        "anthropic": ("ANTHROPIC_API_KEY",),
-        "google_genai": ("GOOGLE_API_KEY",),
-        "ollama": (),
-        "openai": (
-            "OPENAI_API_KEY",
-            "OPENAI_ORG_ID",
-            "OPENAI_PROJECT_ID",
-        ),
-    }
-    if provider not in provider_environment:
+    if provider not in DEEPAGENTS_PROVIDER_REQUIRED_ENVIRONMENT:
         raise PolicyDenied(
             "unsupported Deep Agents provider; use anthropic, google_genai, ollama, or openai"
         )
@@ -1189,10 +1192,35 @@ def deepagents_process_environment(
         "DEEPAGENTS_CODE_OLLAMA_DISCOVERY": "0",
         "DEEPAGENTS_CODE_OFFLINE": "1",
     }
-    for name in provider_environment[provider]:
+    provider_environment = (
+        DEEPAGENTS_PROVIDER_REQUIRED_ENVIRONMENT[provider]
+        + DEEPAGENTS_PROVIDER_OPTIONAL_ENVIRONMENT[provider]
+    )
+    for name in provider_environment:
         if name in os.environ:
             environment[name] = os.environ[name]
     return environment
+
+
+def deepagents_provider_configuration(provider: str) -> dict[str, Any]:
+    """Report provider readiness without exposing credential values."""
+    if provider not in DEEPAGENTS_PROVIDER_REQUIRED_ENVIRONMENT:
+        raise ValueError(
+            "unsupported Deep Agents provider; use anthropic, google_genai, ollama, or openai"
+        )
+    required = DEEPAGENTS_PROVIDER_REQUIRED_ENVIRONMENT[provider]
+    optional = DEEPAGENTS_PROVIDER_OPTIONAL_ENVIRONMENT[provider]
+    present = tuple(name for name in required + optional if bool(os.environ.get(name)))
+    missing = tuple(name for name in required if not os.environ.get(name))
+    return {
+        "provider": provider,
+        "required_environment_names": list(required),
+        "optional_environment_names": list(optional),
+        "present_environment_names": list(present),
+        "missing_environment_names": list(missing),
+        "custom_endpoint_overrides_supported": False,
+        "ready": not missing,
+    }
 
 
 def checked_git(
@@ -1313,14 +1341,10 @@ class DeepAgentsCandidateProvider:
         max_turns: int = 20,
         scripted_smoke: bool = False,
     ) -> None:
-        if isinstance(model, str) and ":" in model:
-            raise ValueError(
-                "Deep Agents model identifiers must not contain ':'; "
-                "use an untagged provider model identifier"
-            )
-        for label, value in (("provider", provider), ("model", model)):
-            if not isinstance(value, str) or DEEPAGENTS_IDENTITY_PATTERN.fullmatch(value) is None:
-                raise ValueError(f"invalid Deep Agents {label}")
+        if not isinstance(provider, str) or DEEPAGENTS_PROVIDER_PATTERN.fullmatch(provider) is None:
+            raise ValueError("invalid Deep Agents provider")
+        if not isinstance(model, str) or DEEPAGENTS_MODEL_PATTERN.fullmatch(model) is None:
+            raise ValueError("invalid Deep Agents model")
         if provider not in SUPPORTED_DEEPAGENTS_PROVIDERS:
             raise ValueError(
                 "unsupported Deep Agents provider; use " + ", ".join(SUPPORTED_DEEPAGENTS_PROVIDERS)
@@ -1395,8 +1419,10 @@ class DeepAgentsCandidateProvider:
             str(request_path),
             "--result",
             str(worker_result_path),
+            "--provider",
+            self.provider,
             "--model",
-            model_spec,
+            self.model,
             "--invocation-id",
             invocation_id,
             "--max-turns",
@@ -3191,12 +3217,12 @@ def verify_deepagents_real_model_artifacts(
             or DEEPAGENTS_INVOCATION_PATTERN.fullmatch(invocation_id) is None
         ):
             issues.append("Deep Agents execution invocation ID is invalid")
-        for field in ("provider", "model"):
-            value = execution.get(field)
-            if not isinstance(value, str) or DEEPAGENTS_IDENTITY_PATTERN.fullmatch(value) is None:
-                issues.append(f"Deep Agents execution {field} is invalid")
         provider = execution.get("provider")
         model = execution.get("model")
+        if not isinstance(provider, str) or DEEPAGENTS_PROVIDER_PATTERN.fullmatch(provider) is None:
+            issues.append("Deep Agents execution provider is invalid")
+        if not isinstance(model, str) or DEEPAGENTS_MODEL_PATTERN.fullmatch(model) is None:
+            issues.append("Deep Agents execution model is invalid")
         scripted_smoke = execution.get("scripted_smoke")
         if not isinstance(scripted_smoke, bool):
             issues.append("Deep Agents execution scripted-smoke state is invalid")
@@ -3769,6 +3795,7 @@ def preflight(
     with_docker: bool,
     require_deepagents: bool = False,
     deepagents_python: str = sys.executable,
+    deepagents_provider: str | None = None,
 ) -> dict[str, Any]:
     problems = []
     if Path.cwd().resolve() != PACKAGE_ROOT:
@@ -3800,6 +3827,15 @@ def preflight(
         if require_deepagents and deepagents_version != DEEPAGENTS_SDK_VERSION:
             problems.append(
                 f"Deep Agents SDK {DEEPAGENTS_SDK_VERSION} is required; found {deepagents_version}"
+            )
+    provider_configuration = None
+    if deepagents_provider is not None:
+        provider_configuration = deepagents_provider_configuration(deepagents_provider)
+        if provider_configuration["missing_environment_names"]:
+            problems.append(
+                "missing required environment for "
+                f"{deepagents_provider}: "
+                + ", ".join(provider_configuration["missing_environment_names"])
             )
     docker_status = "not requested"
     if with_docker:
@@ -3846,6 +3882,7 @@ def preflight(
         "ok": not problems,
         "package_root": str(PACKAGE_ROOT),
         "deepagents": deepagents_version,
+        "model_provider": provider_configuration,
         "docker": docker_status,
         "sensitive_environment_names": sensitive,
         "problems": problems,
@@ -3939,6 +3976,7 @@ def parser() -> argparse.ArgumentParser:
     preflight_parser.add_argument("--with-docker", action="store_true")
     preflight_parser.add_argument("--require-deepagents", action="store_true")
     preflight_parser.add_argument("--deepagents-python", default=sys.executable)
+    preflight_parser.add_argument("--deepagents-provider", choices=SUPPORTED_DEEPAGENTS_PROVIDERS)
 
     run_parser = subcommands.add_parser("run")
     run_parser.add_argument(
@@ -3954,8 +3992,15 @@ def parser() -> argparse.ArgumentParser:
         choices=("fixture", "deepagents"),
         default="fixture",
     )
-    run_parser.add_argument("--deepagents-provider")
-    run_parser.add_argument("--deepagents-model")
+    run_parser.add_argument(
+        "--deepagents-provider",
+        choices=SUPPORTED_DEEPAGENTS_PROVIDERS,
+        help="model adapter to use for an opt-in Deep Agents run",
+    )
+    run_parser.add_argument(
+        "--deepagents-model",
+        help="provider model identifier; Ollama tag separators are supported",
+    )
     run_parser.add_argument("--deepagents-python", default=sys.executable)
     run_parser.add_argument("--deepagents-max-turns", type=int, default=20)
 
@@ -3981,6 +4026,7 @@ def main() -> int:
             args.with_docker,
             args.require_deepagents,
             args.deepagents_python,
+            args.deepagents_provider,
         )
         print(json.dumps(result, indent=2, sort_keys=True))
         return 0 if result["ok"] else 1
@@ -3991,6 +4037,15 @@ def main() -> int:
                 print(
                     "--deepagents-provider and --deepagents-model are required "
                     "for a Deep Agents run",
+                    file=sys.stderr,
+                )
+                return 2
+            provider_configuration = deepagents_provider_configuration(args.deepagents_provider)
+            if provider_configuration["missing_environment_names"]:
+                print(
+                    "missing required environment for "
+                    f"{args.deepagents_provider}: "
+                    + ", ".join(provider_configuration["missing_environment_names"]),
                     file=sys.stderr,
                 )
                 return 2

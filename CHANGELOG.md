@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+- Documented why the direct SDK is the supported integration and kept the
+  optional `deepagents-code==0.1.62` lane disabled because the current CLI
+  cannot satisfy the complete ambient-state and network-isolation contract.
+- Added public model-provider setup and offline credential-presence preflight
+  guidance without storing or printing secret values.
+- Removed dated research, continuation, and internal planning documents from
+  the public tree and added a public-surface regression guard for them.
+- Refreshed the hash-locked dependency evidence to the 2026-08-26 cutoff while
+  retaining the qualified `deepagents==0.7.8` direct pin; recorded current
+  upstream `deepagents==0.7.9` and `deepagents-code==0.1.62` releases.
+
 ## 0.1.0 - 2026-08-25
 
 - Added a policy-controlled local remediation controller.
@@ -23,8 +36,8 @@
   every non-successful closeout.
 - Rejected hidden Git rename/copy metadata, reconciled post-apply paths, and
   covered adversarial dictionary-unpack execution in the AST verifier.
-- Added a pinned Hermes reference-parity contract and a complete continuation
-  handoff so future work preserves shared guarantees without coupling runtimes.
+- Added a pinned Hermes reference-parity contract so applicable safety
+  guarantees can be maintained without coupling runtimes.
 - Added strict public Deep Agents request/result schemas and fail-closed
   top-level field validation at both ends of the worker boundary.
 - Added a no-cost full controller-to-worker Deep Agents smoke, including patch
@@ -32,3 +45,12 @@
 - Fixed retained-patch identity checks to compare canonical paths, including
   macOS `/var` and `/private/var` aliases, without weakening collision checks.
 - Expanded CI to run pinned Ruff and both SDK smokes on Python 3.11 and 3.12.
+- Added reproducible Python 3.11/3.12 universal dependency locks with complete
+  artifact hashes, exact resolver policy, PyPI provenance, and normalized
+  license evidence.
+- Added staged, atomic upstream qualification for package releases, source tags,
+  scoped source commits, and the complete 40-page Python plus 16-page Code
+  documentation inventory.
+- Added an unprivileged, read-only, resource-bounded Docker SDK smoke with OS
+  network isolation, controller-owned deadlines, strict retained-result
+  validation, ownership-bound cleanup, and read-only scheduled drift detection.

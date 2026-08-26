@@ -16,9 +16,12 @@ ROOT = Path(__file__).resolve().parents[1]
 BASELINE_PATH = ROOT / "security" / "image-vulnerability-baseline.json"
 PIN_SOURCES = (
     *sorted(ROOT.glob("compose*.yaml")),
+    ROOT / "docker" / "deepagents-smoke" / "Dockerfile",
     ROOT / "docker" / "incident-poc" / "Dockerfile",
 )
 IMAGE_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._/-]*(?::[A-Za-z0-9._-]+)?@sha256:[0-9a-f]{64}")
+TRIVY_TIMEOUT = "10m"
+SUBPROCESS_TIMEOUT_SECONDS = 660
 
 
 def read_baseline() -> dict[str, Any]:
@@ -74,6 +77,8 @@ def scan(image: str) -> tuple[dict[str, int], str]:
             "trivy",
             "image",
             "--quiet",
+            "--timeout",
+            TRIVY_TIMEOUT,
             "--severity",
             "HIGH,CRITICAL",
             "--format",
@@ -84,7 +89,7 @@ def scan(image: str) -> tuple[dict[str, int], str]:
         text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
-        timeout=600,
+        timeout=SUBPROCESS_TIMEOUT_SECONDS,
         check=False,
     )
     if result.returncode != 0:

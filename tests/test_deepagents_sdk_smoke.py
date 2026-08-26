@@ -13,6 +13,17 @@ SPEC.loader.exec_module(smoke)
 
 
 class DeepAgentsSdkSmokeTests(unittest.TestCase):
+    def test_sdk_import_and_model_construction_are_inside_network_guard(self) -> None:
+        def import_with_network_attempt() -> object:
+            smoke.socket.getaddrinfo("example.invalid", 443)
+            raise AssertionError("network denial did not stop SDK import")
+
+        with (
+            mock.patch.object(smoke, "_load_worker", side_effect=import_with_network_attempt),
+            self.assertRaisesRegex(RuntimeError, "network access is disabled during the SDK smoke"),
+        ):
+            smoke.run_smoke()
+
     def test_worker_policy_has_exact_bounded_tool_surface(self) -> None:
         worker = smoke._load_worker()
         self.assertEqual(
@@ -60,6 +71,27 @@ class DeepAgentsSdkSmokeTests(unittest.TestCase):
                         **boundaries,
                     )
                 )
+
+    def test_os_network_guard_accepts_expected_denials(self) -> None:
+        probe = mock.Mock()
+        probe.connect.side_effect = OSError("network unreachable")
+        with (
+            mock.patch.object(smoke.socket, "getaddrinfo", side_effect=OSError("no DNS")),
+            mock.patch.object(smoke.socket, "socket", return_value=probe),
+        ):
+            smoke._assert_os_network_disabled()
+        probe.settimeout.assert_called_once_with(1)
+        probe.close.assert_called_once_with()
+
+    def test_os_network_guard_rejects_unexpected_dns_success(self) -> None:
+        probe = mock.Mock()
+        probe.connect.side_effect = OSError("network unreachable")
+        with (
+            mock.patch.object(smoke.socket, "getaddrinfo", return_value=[object()]),
+            mock.patch.object(smoke.socket, "socket", return_value=probe),
+            self.assertRaisesRegex(RuntimeError, "DNS resolution unexpectedly succeeded"),
+        ):
+            smoke._assert_os_network_disabled()
 
     def test_scripted_model_exercises_openai_codex_profile(self) -> None:
         try:
@@ -134,7 +166,8 @@ class DeepAgentsSdkSmokeTests(unittest.TestCase):
                     workspace=workspace,
                     request_path=request_path,
                     result_path=root / "result.json",
-                    model="openai:scripted-smoke",
+                    provider="openai",
+                    model="scripted-smoke",
                     invocation_id="a" * 32,
                     max_turns=4,
                     scripted_smoke=True,

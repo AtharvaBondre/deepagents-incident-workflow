@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import argparse
 import importlib.util
 import json
 import os
@@ -172,13 +173,33 @@ def _smoke_passed(
     )
 
 
-def run_smoke() -> dict[str, Any]:
-    worker = _load_worker()
-    actual_version = version("deepagents")
-    if actual_version != worker.EXPECTED_DEEPAGENTS_VERSION:
-        raise RuntimeError(
-            f"deepagents=={worker.EXPECTED_DEEPAGENTS_VERSION} is required; found {actual_version}"
-        )
+def _assert_os_network_disabled() -> None:
+    errors: list[str] = []
+    try:
+        socket.getaddrinfo("docs.langchain.com", 443)
+    except OSError:
+        pass
+    else:
+        errors.append("DNS resolution unexpectedly succeeded")
+    probe = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    probe.settimeout(1)
+    try:
+        probe.connect(("1.1.1.1", 443))
+    except OSError:
+        pass
+    else:
+        errors.append("external socket connection unexpectedly succeeded")
+    finally:
+        probe.close()
+    if errors:
+        raise RuntimeError("; ".join(errors))
+
+
+def run_smoke(
+    *, output: Path | None = None, assert_os_network_disabled: bool = False
+) -> dict[str, Any]:
+    if assert_os_network_disabled:
+        _assert_os_network_disabled()
     packet = {
         "schema_version": 1,
         "policy": {
@@ -186,7 +207,6 @@ def run_smoke() -> dict[str, Any]:
             "allowed_paths": ["app/"],
         },
     }
-    scripted = _scripted_model()
     network_attempts: list[str] = []
 
     def deny_network(*args: Any, **kwargs: Any) -> Any:
@@ -207,6 +227,14 @@ def run_smoke() -> dict[str, Any]:
         mock.patch("socket.getaddrinfo", side_effect=deny_network),
         mock.patch.object(socket.socket, "connect", side_effect=deny_network),
     ):
+        worker = _load_worker()
+        actual_version = version("deepagents")
+        if actual_version != worker.EXPECTED_DEEPAGENTS_VERSION:
+            raise RuntimeError(
+                f"deepagents=={worker.EXPECTED_DEEPAGENTS_VERSION} is required; "
+                f"found {actual_version}"
+            )
+        scripted = _scripted_model()
         workspace = Path(temporary) / "workspace"
         target = workspace / "app" / "value.txt"
         forbidden_target = workspace / "tests" / "forbidden.txt"
@@ -273,14 +301,21 @@ def run_smoke() -> dict[str, Any]:
             "final_response_present": bool(final_content),
             "passed": passed,
         }
-    ARTIFACTS.mkdir(exist_ok=True)
-    output = ARTIFACTS / "deepagents-sdk-smoke.json"
+    output = output or ARTIFACTS / "deepagents-sdk-smoke.json"
+    output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(record, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return {"artifact": str(output), **record}
 
 
 def main() -> int:
-    result = run_smoke()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--output", type=Path)
+    parser.add_argument("--assert-os-network-disabled", action="store_true")
+    args = parser.parse_args()
+    result = run_smoke(
+        output=args.output,
+        assert_os_network_disabled=args.assert_os_network_disabled,
+    )
     print(json.dumps(result, indent=2, sort_keys=True))
     return 0 if result["passed"] else 1
 
