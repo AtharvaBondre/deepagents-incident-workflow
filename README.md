@@ -9,7 +9,7 @@ This is an independent, experimental community project. It is not affiliated wit
 ```mermaid
 flowchart LR
     A["Untrusted incident and bounded evidence"] --> B["Controller"]
-    B --> C["Fresh Deep Agents SDK process"]
+    B --> C["Fresh Python or TypeScript Deep Agents SDK process"]
     C --> D["Disposable virtual-root workspace"]
     D --> E["Controller-derived patch"]
     E --> F["Path and content policy"]
@@ -25,7 +25,9 @@ The central rule is: **Deep Agents proposes; the controller decides.** Model tex
 ## Included
 
 - Success, retry-success, exhaustion, timeout, prompt-injection, early-exit, forged-success, crash, and verifier-timeout regressions.
-- A real `deepagents==0.7.8` adapter that starts a fresh process for every attempt.
+- First-class Python (`deepagents==0.7.8`) and TypeScript
+  (`deepagents@1.13.1`) SDK adapters that start a fresh process for every
+  attempt and feed the same controller-owned verification path.
 - A virtual-root `FilesystemBackend` with explicit allow/deny permissions and only `ls`, `read_file`, `write_file`, `edit_file`, `glob`, and `grep`.
 - No agent shell, deletion, network tool, MCP, subagent, skill discovery, long-term memory, checkpointer, store, hook, plugin, or LangSmith tracing in the default integration.
 - Controller-derived patches with size, path, symlink, binary, mode-change, and restricted-content checks.
@@ -37,27 +39,34 @@ The central rule is: **Deep Agents proposes; the controller decides.** Model tex
 ## Requirements
 
 - Python 3.11 or 3.12
+- Node.js 22.23.2 and npm 10.9.8 only when using the TypeScript SDK worker
 - Git
 - Docker for candidate verification; Compose for the optional service scenario
-- `deepagents==0.7.8` and its provider adapters installed from the qualified
-  transitive hash lock only for the SDK smoke or a real-model attempt
+- One optional qualified SDK runtime: Python packages from transitive hash
+  locks, or TypeScript packages from the integrity-locked npm lock
 
 Deep Agents, LangGraph, LangChain, and LangSmith remain external dependencies. Nothing from those projects is vendored here.
 
 ## Install
 
 ```bash
-git clone https://github.com/AtharvaBondre/deepagents-incident-workflow.git
+git clone https://github.com/Scoutflo/deepagents-incident-workflow.git
 cd deepagents-incident-workflow
 ./scripts/bootstrap-pinned-images.sh sandbox
 ```
 
 The deterministic workflow uses only the Python standard library and Docker; it
 does not require a model key. Install the optional hash-locked Deep Agents
-runtime only when running the SDK smoke or a real-model attempt:
+runtime only when running an SDK smoke or a real-model attempt:
 
 ```bash
+# Python SDK worker
 ./scripts/install-deepagents-runtime.sh
+
+# TypeScript SDK worker (requires exactly Node 22.23.2 and npm 10.9.8)
+node --version
+npm --version
+./scripts/install-deepagents-typescript-runtime.sh
 ```
 
 ## Deterministic quick start
@@ -78,7 +87,7 @@ runtime only when running the SDK smoke or a real-model attempt:
 
 The fixture provider deliberately fails the first attempt and succeeds on the second. The controller passes bounded feedback, verifies the exact candidate, recreates it in a clean workspace, emits only draft delivery mocks, and cleans up.
 
-## Pinned Deep Agents SDK smoke
+## Pinned Deep Agents SDK smokes
 
 Validate the qualified dependency record, rebuild the ignored repository-local
 runtime from the Python-version-specific transitive hash lock, and execute a
@@ -95,10 +104,37 @@ scripted model without a transport call:
 ./scripts/run-network-isolated-sdk-smoke.sh
 ```
 
-The first smoke directly exercises the real Deep Agents graph, OpenAI/Codex harness-profile path, and filesystem middleware. The end-to-end smoke then crosses the actual controller, isolated worker subprocess, graph tool loop, shadow-Git patch derivation, pinned Docker tests, trusted verifier, clean reapply, draft delivery, independent verification, and cleanup. Both use scripted local models, send no paid inference request, and fail on observed Python socket or DNS calls; that instrumentation is a regression detector, not an OS network sandbox.
+The equivalent TypeScript qualification uses the official `deepagents`
+JavaScript package, an integrity-locked npm dependency graph, a compiled worker
+whose digest is part of controller policy, and the same no-cost controller
+path:
 
-The final smoke rebuilds the exact Python 3.12 lock in a digest-pinned image and
-runs the SDK smoke as an unprivileged process with Docker network mode `none`, a
+```bash
+python3 -I scripts/typescript_dependency_qualification.py
+./scripts/install-deepagents-typescript-runtime.sh
+node --test .deepagents-typescript-runtime/dist/deepagents_worker.test.js
+node .deepagents-typescript-runtime/dist/deepagents_sdk_smoke.js
+python3 scripts/deepagents_e2e_smoke.py \
+  --language typescript \
+  --node node
+./scripts/run-local.sh preflight \
+  --require-deepagents \
+  --deepagents-language typescript \
+  --deepagents-node node
+./scripts/run-network-isolated-typescript-sdk-smoke.sh
+```
+
+The direct smokes exercise the real Deep Agents graph, OpenAI harness-profile
+path, and filesystem middleware. The end-to-end smokes then cross the actual
+controller, isolated worker subprocess, graph tool loop, shadow-Git patch
+derivation, pinned Docker tests, trusted verifier, clean reapply, draft
+delivery, independent verification, and cleanup. They use scripted local
+models and send no paid inference request. In-process network interception is a
+regression detector; the final Docker smokes provide the OS network boundary.
+
+The final smokes rebuild the exact Python 3.12 or Node 22.23.2 dependency set
+in digest-pinned images and run as unprivileged processes with Docker network
+mode `none`, a
 read-only root, resource limits, a 120-second container-execution deadline,
 per-run ownership labels, and verified cleanup. CI separately bounds the whole
 build-and-run job. The controller retains and strictly validates the smoke
@@ -124,7 +160,7 @@ Cleanup derives targets from durable controller intents, revalidates exact owner
 
 ## Opt-in real-model attempt
 
-Configure one supported provider as described in [Model provider setup](docs/model-setup.md). The controller forwards only credential names allowlisted for that provider, does not forward endpoint overrides, and gives the worker an ephemeral `HOME`. Real-model runs require the freshly rebuilt repository-local runtime.
+Configure one supported provider as described in [Model provider setup](docs/model-setup.md). The controller forwards only credential names allowlisted for that provider, does not forward endpoint overrides, and gives the worker an ephemeral `HOME`. Real-model runs require the freshly rebuilt repository-local runtime. SDK language is independent of the candidate repository's language: both workers feed the same Python controller and verifier.
 
 Check the complete local setup without making a model request:
 
@@ -147,6 +183,24 @@ Check the complete local setup without making a model request:
   --max-attempts 2
 ```
 
+For the TypeScript SDK worker, select it explicitly:
+
+```bash
+./scripts/install-deepagents-typescript-runtime.sh
+
+./scripts/run-local.sh run \
+  --scenario retry-success \
+  --candidate-provider deepagents \
+  --deepagents-language typescript \
+  --deepagents-provider openai \
+  --deepagents-model model-id \
+  --deepagents-node node \
+  --budget-seconds 600 \
+  --max-attempts 2
+
+./scripts/run-local.sh verify --latest
+```
+
 Supported adapter prefixes are `anthropic`, `google_genai`, `ollama`, and `openai`. A model provider request is the only intended network activity in this mode. The model has no network-capable tool and cannot run repository code. The controller runs tests afterward in its separate network-disabled verifier boundary.
 
 Review a provider's retention and processing terms before using non-synthetic input. Never place credentials in repository files or artifacts.
@@ -162,7 +216,8 @@ added. It would not replace the SDK-native core.
 
 ## Deep Agents, LangGraph, and LangSmith
 
-- Deep Agents is the untrusted reasoning and filesystem-tool layer.
+- Either supported Deep Agents SDK is the untrusted reasoning and
+  filesystem-tool layer; language selection never changes acceptance authority.
 - LangGraph is the underlying graph runtime. The initial workflow starts a fresh graph with no checkpointer or store, so no incident state crosses attempts.
 - LangSmith tracing, evaluation, deployment, and Agent Server are optional external capabilities. They are disabled and not required for local verification.
 - LLM rubrics and goals may provide advisory feedback, but never delivery authority.

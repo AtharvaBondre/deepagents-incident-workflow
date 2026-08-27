@@ -9,6 +9,7 @@ case "${scope}" in
   sandbox)
     sources=(
       "${repository_root}/docker/deepagents-smoke/Dockerfile"
+      "${repository_root}/docker/deepagents-typescript-smoke/Dockerfile"
       "${repository_root}/docker/incident-poc/Dockerfile"
     )
     ;;
@@ -16,6 +17,7 @@ case "${scope}" in
     sources=(
       "${repository_root}/compose.event-indexing.yaml"
       "${repository_root}/docker/deepagents-smoke/Dockerfile"
+      "${repository_root}/docker/deepagents-typescript-smoke/Dockerfile"
       "${repository_root}/docker/incident-poc/Dockerfile"
     )
     ;;

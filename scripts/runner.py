@@ -84,8 +84,8 @@ VALIDATION_POLICY = _exact_policy_keys(
 DEEPAGENTS_POLICY = _exact_policy_keys(
     WORKFLOW_POLICY["deepagents"],
     {
-        "sdk_version",
-        "worker",
+        "default_sdk_language",
+        "runtimes",
         "allowed_filesystem_tools",
         "maximum_attempt_seconds",
     },
@@ -138,24 +138,81 @@ MAX_REMEDIATION_SECONDS = float(
     )
 )
 CANDIDATE_CONTRACT_VERSION = 1
-DEEPAGENTS_SDK_VERSION = DEEPAGENTS_POLICY["sdk_version"]
+SUPPORTED_DEEPAGENTS_LANGUAGES = ("python", "typescript")
+DEEPAGENTS_DEFAULT_SDK_LANGUAGE = DEEPAGENTS_POLICY["default_sdk_language"]
+if DEEPAGENTS_DEFAULT_SDK_LANGUAGE not in SUPPORTED_DEEPAGENTS_LANGUAGES:
+    raise RuntimeError("trusted workflow policy default Deep Agents language is invalid")
+DEEPAGENTS_RUNTIMES = _exact_policy_keys(
+    DEEPAGENTS_POLICY["runtimes"], set(SUPPORTED_DEEPAGENTS_LANGUAGES), "Deep Agents runtimes"
+)
+DEEPAGENTS_PYTHON_RUNTIME = _exact_policy_keys(
+    DEEPAGENTS_RUNTIMES["python"], {"sdk_version", "worker"}, "Python runtime"
+)
+DEEPAGENTS_TYPESCRIPT_RUNTIME = _exact_policy_keys(
+    DEEPAGENTS_RUNTIMES["typescript"],
+    {
+        "sdk_version",
+        "node_version",
+        "worker_source",
+        "package_lock",
+        "worker_build_sha256",
+    },
+    "TypeScript runtime",
+)
+
+
+def _trusted_repository_file(value: Any, label: str) -> Path:
+    if not isinstance(value, str) or not re.fullmatch(
+        r"[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*", value
+    ):
+        raise RuntimeError(f"trusted workflow policy {label} is invalid")
+    candidate = PACKAGE_ROOT / value
+    try:
+        candidate.relative_to(PACKAGE_ROOT)
+    except (TypeError, ValueError) as exc:
+        raise RuntimeError(f"trusted workflow policy {label} is invalid") from exc
+    if not candidate.is_file() or candidate.is_symlink():
+        raise RuntimeError(f"trusted workflow policy {label} is missing")
+    return candidate
+
+
+DEEPAGENTS_SDK_VERSIONS: dict[str, str] = {}
+for _language, _runtime in DEEPAGENTS_RUNTIMES.items():
+    _version = _runtime.get("sdk_version")
+    if not isinstance(_version, str) or re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", _version) is None:
+        raise RuntimeError(f"trusted workflow policy {_language} SDK version is invalid")
+    DEEPAGENTS_SDK_VERSIONS[_language] = _version
+
+# Backward-compatible public constant for the original Python runtime.
+DEEPAGENTS_SDK_VERSION = DEEPAGENTS_SDK_VERSIONS["python"]
+DEEPAGENTS_WORKER = _trusted_repository_file(
+    DEEPAGENTS_PYTHON_RUNTIME["worker"], "Python Deep Agents worker"
+)
+DEEPAGENTS_TYPESCRIPT_WORKER_SOURCE = _trusted_repository_file(
+    DEEPAGENTS_TYPESCRIPT_RUNTIME["worker_source"], "TypeScript Deep Agents worker source"
+)
+DEEPAGENTS_TYPESCRIPT_PACKAGE_LOCK = _trusted_repository_file(
+    DEEPAGENTS_TYPESCRIPT_RUNTIME["package_lock"], "TypeScript package lock"
+)
+DEEPAGENTS_TYPESCRIPT_NODE_VERSION = DEEPAGENTS_TYPESCRIPT_RUNTIME["node_version"]
 if (
-    not isinstance(DEEPAGENTS_SDK_VERSION, str)
-    or re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", DEEPAGENTS_SDK_VERSION) is None
+    not isinstance(DEEPAGENTS_TYPESCRIPT_NODE_VERSION, str)
+    or re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", DEEPAGENTS_TYPESCRIPT_NODE_VERSION) is None
 ):
-    raise RuntimeError("trusted workflow policy Deep Agents SDK version is invalid")
-DEEPAGENTS_WORKER_VALUE = DEEPAGENTS_POLICY["worker"]
-if not isinstance(DEEPAGENTS_WORKER_VALUE, str) or not re.fullmatch(
-    r"[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*", DEEPAGENTS_WORKER_VALUE
+    raise RuntimeError("trusted workflow policy TypeScript Node version is invalid")
+DEEPAGENTS_TYPESCRIPT_WORKER_BUILD_SHA256 = DEEPAGENTS_TYPESCRIPT_RUNTIME["worker_build_sha256"]
+if (
+    not isinstance(DEEPAGENTS_TYPESCRIPT_WORKER_BUILD_SHA256, str)
+    or re.fullmatch(r"[0-9a-f]{64}", DEEPAGENTS_TYPESCRIPT_WORKER_BUILD_SHA256) is None
 ):
-    raise RuntimeError("trusted workflow policy Deep Agents worker is invalid")
-DEEPAGENTS_WORKER = PACKAGE_ROOT / DEEPAGENTS_WORKER_VALUE
-try:
-    DEEPAGENTS_WORKER.relative_to(PACKAGE_ROOT)
-except (TypeError, ValueError) as exc:
-    raise RuntimeError("trusted workflow policy Deep Agents worker is invalid") from exc
-if not DEEPAGENTS_WORKER.is_file() or DEEPAGENTS_WORKER.is_symlink():
-    raise RuntimeError("trusted workflow policy Deep Agents worker is missing")
+    raise RuntimeError("trusted workflow policy TypeScript worker build digest is invalid")
+DEEPAGENTS_TYPESCRIPT_RUNTIME_ROOT = PACKAGE_ROOT / ".deepagents-typescript-runtime"
+DEEPAGENTS_TYPESCRIPT_INSTALLED_WORKER = (
+    DEEPAGENTS_TYPESCRIPT_RUNTIME_ROOT / "dist" / "deepagents_worker.js"
+)
+DEEPAGENTS_TYPESCRIPT_RUNTIME_MANIFEST = (
+    DEEPAGENTS_TYPESCRIPT_RUNTIME_ROOT / "runtime-manifest.json"
+)
 DEEPAGENTS_ALLOWED_FILESYSTEM_TOOLS = _policy_string_list(
     DEEPAGENTS_POLICY["allowed_filesystem_tools"], "Deep Agents filesystem tools"
 )
@@ -232,6 +289,7 @@ DEEPAGENTS_WORKER_RESULT_FIELDS = frozenset(
     {
         "schema_version",
         "runtime",
+        "sdk_language",
         "runtime_version",
         "provider_package",
         "provider_package_version",
@@ -260,10 +318,18 @@ DEEPAGENTS_PROVIDER_OPTIONAL_ENVIRONMENT = {
     "openai": ("OPENAI_ORG_ID", "OPENAI_PROJECT_ID"),
 }
 DEEPAGENTS_PROVIDER_PACKAGES = {
-    "anthropic": ("langchain-anthropic", "1.6.1"),
-    "google_genai": ("langchain-google-genai", "4.3.5"),
-    "ollama": ("langchain-ollama", "1.1.0"),
-    "openai": ("langchain-openai", "1.6.0"),
+    "python": {
+        "anthropic": ("langchain-anthropic", "1.6.1"),
+        "google_genai": ("langchain-google-genai", "4.3.5"),
+        "ollama": ("langchain-ollama", "1.1.0"),
+        "openai": ("langchain-openai", "1.6.0"),
+    },
+    "typescript": {
+        "anthropic": ("@langchain/anthropic", "1.5.8"),
+        "google_genai": ("@langchain/google-genai", "2.3.0"),
+        "ollama": ("@langchain/ollama", "1.3.0"),
+        "openai": ("@langchain/openai", "1.5.10"),
+    },
 }
 VERIFIER_RECEIPT_VERSION = 1
 COMPOSE_CLEANUP_INTENT_VERSION = 1
@@ -1337,10 +1403,18 @@ class DeepAgentsCandidateProvider:
         *,
         provider: str,
         model: str,
+        sdk_language: str = DEEPAGENTS_DEFAULT_SDK_LANGUAGE,
         runtime_python: str = sys.executable,
+        runtime_node: str = "node",
+        typescript_worker: Path | None = None,
         max_turns: int = 20,
         scripted_smoke: bool = False,
     ) -> None:
+        if sdk_language not in SUPPORTED_DEEPAGENTS_LANGUAGES:
+            raise ValueError(
+                "unsupported Deep Agents SDK language; use "
+                + ", ".join(SUPPORTED_DEEPAGENTS_LANGUAGES)
+            )
         if not isinstance(provider, str) or DEEPAGENTS_PROVIDER_PATTERN.fullmatch(provider) is None:
             raise ValueError("invalid Deep Agents provider")
         if not isinstance(model, str) or DEEPAGENTS_MODEL_PATTERN.fullmatch(model) is None:
@@ -1355,12 +1429,26 @@ class DeepAgentsCandidateProvider:
             raise ValueError("Deep Agents scripted smoke requires openai and scripted-smoke")
         if not 1 <= max_turns <= 20:
             raise ValueError("Deep Agents max turns must be between one and twenty")
-        resolved_python = shutil.which(runtime_python)
-        if resolved_python is None:
-            raise ValueError("Deep Agents runtime Python is not executable")
+        runtime_value = runtime_python if sdk_language == "python" else runtime_node
+        resolved_runtime = shutil.which(runtime_value)
+        if resolved_runtime is None:
+            runtime_label = "Python" if sdk_language == "python" else "Node"
+            raise ValueError(f"Deep Agents runtime {runtime_label} is not executable")
+        worker_path = (
+            DEEPAGENTS_WORKER
+            if sdk_language == "python"
+            else (typescript_worker or DEEPAGENTS_TYPESCRIPT_INSTALLED_WORKER)
+        )
+        worker_path = Path(worker_path).absolute()
+        if not worker_path.is_file() or worker_path.is_symlink():
+            raise ValueError(f"Deep Agents {sdk_language} worker is unavailable")
         self.provider = provider
         self.model = model
-        self.runtime_python = str(Path(resolved_python).absolute())
+        self.sdk_language = sdk_language
+        self.runtime_executable = str(Path(resolved_runtime).absolute())
+        self.worker_path = worker_path
+        # Preserve the public attribute used by existing Python integrations.
+        self.runtime_python = self.runtime_executable if sdk_language == "python" else None
         self.max_turns = max_turns
         self.scripted_smoke = scripted_smoke
 
@@ -1410,9 +1498,9 @@ class DeepAgentsCandidateProvider:
         invocation_id = uuid.uuid4().hex
         model_spec = f"{self.provider}:{self.model}"
         invocation = [
-            self.runtime_python,
-            "-I",
-            str(DEEPAGENTS_WORKER),
+            self.runtime_executable,
+            *(["-I"] if self.sdk_language == "python" else ["--no-global-search-paths"]),
+            str(self.worker_path),
             "--workspace",
             str(sandbox_workspace),
             "--request",
@@ -1447,9 +1535,10 @@ class DeepAgentsCandidateProvider:
             "invocation_id": invocation_id,
             "provider": self.provider,
             "model": self.model,
+            "sdk_language": self.sdk_language,
             "model_spec_sha256": hashlib.sha256(model_spec.encode()).hexdigest(),
-            "runtime_version": DEEPAGENTS_SDK_VERSION,
-            "worker_sha256": hashlib.sha256(DEEPAGENTS_WORKER.read_bytes()).hexdigest(),
+            "runtime_version": DEEPAGENTS_SDK_VERSIONS[self.sdk_language],
+            "worker_sha256": hashlib.sha256(self.worker_path.read_bytes()).hexdigest(),
             "allowed_filesystem_tools": list(DEEPAGENTS_ALLOWED_FILESYSTEM_TOOLS),
             "memory_enabled": False,
             "checkpointer_enabled": False,
@@ -1464,6 +1553,18 @@ class DeepAgentsCandidateProvider:
             "controller_is_sole_acceptor": True,
             "outcome": "RUNNING",
         }
+        if self.sdk_language == "typescript":
+            execution.update(
+                {
+                    "node_version": DEEPAGENTS_TYPESCRIPT_NODE_VERSION,
+                    "worker_source_sha256": hashlib.sha256(
+                        DEEPAGENTS_TYPESCRIPT_WORKER_SOURCE.read_bytes()
+                    ).hexdigest(),
+                    "package_lock_sha256": hashlib.sha256(
+                        DEEPAGENTS_TYPESCRIPT_PACKAGE_LOCK.read_bytes()
+                    ).hexdigest(),
+                }
+            )
         try:
             completed = run_deepagents_process(
                 invocation,
@@ -1491,11 +1592,12 @@ class DeepAgentsCandidateProvider:
                 type(worker_result["schema_version"]) is not int
                 or worker_result["schema_version"] != 1
                 or worker_result["runtime"] != "deepagents"
-                or worker_result["runtime_version"] != DEEPAGENTS_SDK_VERSION
+                or worker_result["sdk_language"] != self.sdk_language
+                or worker_result["runtime_version"] != DEEPAGENTS_SDK_VERSIONS[self.sdk_language]
                 or worker_result["provider_package"]
-                != DEEPAGENTS_PROVIDER_PACKAGES[self.provider][0]
+                != DEEPAGENTS_PROVIDER_PACKAGES[self.sdk_language][self.provider][0]
                 or worker_result["provider_package_version"]
-                != DEEPAGENTS_PROVIDER_PACKAGES[self.provider][1]
+                != DEEPAGENTS_PROVIDER_PACKAGES[self.sdk_language][self.provider][1]
                 or worker_result["profile_plugins_enabled"] is not False
                 or worker_result["model_transport"] != execution["model_transport"]
                 or (
@@ -3234,13 +3336,37 @@ def verify_deepagents_real_model_artifacts(
             expected_model_hash = hashlib.sha256(f"{provider}:{model}".encode()).hexdigest()
             if execution.get("model_spec_sha256") != expected_model_hash:
                 issues.append("Deep Agents execution model specification digest is invalid")
-        if execution.get("runtime_version") != DEEPAGENTS_SDK_VERSION:
-            issues.append("Deep Agents execution runtime version is invalid")
+        sdk_language = execution.get("sdk_language")
+        if sdk_language not in SUPPORTED_DEEPAGENTS_LANGUAGES:
+            issues.append("Deep Agents execution SDK language is invalid")
+            sdk_language = None
         if (
-            execution.get("worker_sha256")
-            != hashlib.sha256(DEEPAGENTS_WORKER.read_bytes()).hexdigest()
+            sdk_language is not None
+            and execution.get("runtime_version") != DEEPAGENTS_SDK_VERSIONS[sdk_language]
         ):
+            issues.append("Deep Agents execution runtime version is invalid")
+        expected_worker_sha256 = (
+            hashlib.sha256(DEEPAGENTS_WORKER.read_bytes()).hexdigest()
+            if sdk_language == "python"
+            else DEEPAGENTS_TYPESCRIPT_WORKER_BUILD_SHA256
+            if sdk_language == "typescript"
+            else None
+        )
+        if execution.get("worker_sha256") != expected_worker_sha256:
             issues.append("Deep Agents execution worker digest is invalid")
+        if sdk_language == "typescript":
+            if execution.get("node_version") != DEEPAGENTS_TYPESCRIPT_NODE_VERSION:
+                issues.append("Deep Agents execution Node version is invalid")
+            if (
+                execution.get("worker_source_sha256")
+                != hashlib.sha256(DEEPAGENTS_TYPESCRIPT_WORKER_SOURCE.read_bytes()).hexdigest()
+            ):
+                issues.append("Deep Agents execution worker source digest is invalid")
+            if (
+                execution.get("package_lock_sha256")
+                != hashlib.sha256(DEEPAGENTS_TYPESCRIPT_PACKAGE_LOCK.read_bytes()).hexdigest()
+            ):
+                issues.append("Deep Agents execution package lock digest is invalid")
         if execution.get("allowed_filesystem_tools") != list(DEEPAGENTS_ALLOWED_FILESYSTEM_TOOLS):
             issues.append("Deep Agents execution tool policy is invalid")
         for field in (
@@ -3258,7 +3384,11 @@ def verify_deepagents_real_model_artifacts(
             if execution.get(field) is not True:
                 issues.append(f"Deep Agents execution {field} must be true")
         worker_result = execution.get("worker_result")
-        expected_provider_package = DEEPAGENTS_PROVIDER_PACKAGES.get(provider)
+        expected_provider_package = (
+            DEEPAGENTS_PROVIDER_PACKAGES[sdk_language].get(provider)
+            if sdk_language in SUPPORTED_DEEPAGENTS_LANGUAGES
+            else None
+        )
         expected_transport = "scripted-no-transport" if scripted_smoke is True else "provider"
         network_attempts = (
             worker_result.get("network_attempts") if isinstance(worker_result, dict) else None
@@ -3276,7 +3406,9 @@ def verify_deepagents_real_model_artifacts(
             or type(worker_result.get("schema_version")) is not int
             or worker_result.get("schema_version") != 1
             or worker_result.get("runtime") != "deepagents"
-            or worker_result.get("runtime_version") != DEEPAGENTS_SDK_VERSION
+            or worker_result.get("sdk_language") != sdk_language
+            or sdk_language is None
+            or worker_result.get("runtime_version") != DEEPAGENTS_SDK_VERSIONS[sdk_language]
             or expected_provider_package is None
             or worker_result.get("provider_package") != expected_provider_package[0]
             or worker_result.get("provider_package_version") != expected_provider_package[1]
@@ -3796,8 +3928,12 @@ def preflight(
     require_deepagents: bool = False,
     deepagents_python: str = sys.executable,
     deepagents_provider: str | None = None,
+    deepagents_language: str = DEEPAGENTS_DEFAULT_SDK_LANGUAGE,
+    deepagents_node: str = "node",
 ) -> dict[str, Any]:
     problems = []
+    if deepagents_language not in SUPPORTED_DEEPAGENTS_LANGUAGES:
+        problems.append("unsupported Deep Agents SDK language")
     if Path.cwd().resolve() != PACKAGE_ROOT:
         problems.append("run from the package root through scripts/run-local.sh")
     sensitive = sensitive_environment_names()
@@ -3807,27 +3943,66 @@ def preflight(
         if not shutil.which(binary):
             problems.append(f"missing required command: {binary}")
     deepagents_version = "unavailable"
-    runtime_python = shutil.which(deepagents_python)
-    if require_deepagents and runtime_python is None:
-        problems.append("Deep Agents runtime Python is not executable")
-    elif runtime_python is not None:
-        result = command(
-            [
-                runtime_python,
-                "-c",
-                "from importlib.metadata import version; print(version('deepagents'))",
-            ],
-            cwd=PACKAGE_ROOT,
-            timeout=20,
-        )
-        if result.returncode == 0:
-            deepagents_version = result.stdout.strip()
-        elif require_deepagents:
-            problems.append("Deep Agents SDK is not installed in the selected runtime")
-        if require_deepagents and deepagents_version != DEEPAGENTS_SDK_VERSION:
-            problems.append(
-                f"Deep Agents SDK {DEEPAGENTS_SDK_VERSION} is required; found {deepagents_version}"
+    runtime_executable = "unavailable"
+    if deepagents_language == "python":
+        runtime_python = shutil.which(deepagents_python)
+        if require_deepagents and runtime_python is None:
+            problems.append("Deep Agents runtime Python is not executable")
+        elif runtime_python is not None:
+            runtime_executable = str(Path(runtime_python).absolute())
+            result = command(
+                [
+                    runtime_python,
+                    "-c",
+                    "from importlib.metadata import version; print(version('deepagents'))",
+                ],
+                cwd=PACKAGE_ROOT,
+                timeout=20,
             )
+            if result.returncode == 0:
+                deepagents_version = result.stdout.strip()
+            elif require_deepagents:
+                problems.append("Deep Agents SDK is not installed in the selected runtime")
+    elif deepagents_language == "typescript":
+        runtime_node = shutil.which(deepagents_node)
+        if require_deepagents:
+            try:
+                runtime_executable, worker = qualified_deepagents_typescript_runtime(
+                    deepagents_node
+                )
+            except ValueError as exc:
+                problems.append(str(exc))
+            else:
+                result = command(
+                    [runtime_executable, str(worker), "--runtime-info"],
+                    cwd=PACKAGE_ROOT,
+                    timeout=20,
+                )
+                try:
+                    runtime_info = json.loads(result.stdout)
+                except (TypeError, json.JSONDecodeError):
+                    runtime_info = None
+                if (
+                    result.returncode == 0
+                    and isinstance(runtime_info, dict)
+                    and runtime_info.get("sdk_language") == "typescript"
+                    and runtime_info.get("node_version") == DEEPAGENTS_TYPESCRIPT_NODE_VERSION
+                ):
+                    deepagents_version = str(runtime_info.get("runtime_version", "unavailable"))
+                else:
+                    problems.append("TypeScript Deep Agents runtime inspection failed")
+        elif runtime_node is not None:
+            runtime_executable = str(Path(runtime_node).absolute())
+    if (
+        require_deepagents
+        and deepagents_language in SUPPORTED_DEEPAGENTS_LANGUAGES
+        and deepagents_version != DEEPAGENTS_SDK_VERSIONS[deepagents_language]
+    ):
+        problems.append(
+            "Deep Agents SDK "
+            f"{DEEPAGENTS_SDK_VERSIONS[deepagents_language]} is required for "
+            f"{deepagents_language}; found {deepagents_version}"
+        )
     provider_configuration = None
     if deepagents_provider is not None:
         provider_configuration = deepagents_provider_configuration(deepagents_provider)
@@ -3882,6 +4057,8 @@ def preflight(
         "ok": not problems,
         "package_root": str(PACKAGE_ROOT),
         "deepagents": deepagents_version,
+        "deepagents_language": deepagents_language,
+        "deepagents_runtime_executable": runtime_executable,
         "model_provider": provider_configuration,
         "docker": docker_status,
         "sensitive_environment_names": sensitive,
@@ -3903,6 +4080,62 @@ def qualified_deepagents_runtime(value: str) -> str:
             "scripts/install-deepagents-runtime.sh"
         )
     return str(candidate)
+
+
+def qualified_deepagents_typescript_runtime(value: str) -> tuple[str, Path]:
+    """Require TypeScript runs to use the exact rebuilt local runtime."""
+    runtime_node = shutil.which(value)
+    if runtime_node is None:
+        raise ValueError("TypeScript Deep Agents runs require an executable Node runtime")
+    runtime_node_path = str(Path(runtime_node).absolute())
+    version_result = command(
+        [runtime_node_path, "--version"],
+        cwd=PACKAGE_ROOT,
+        timeout=20,
+    )
+    actual_node_version = version_result.stdout.strip().removeprefix("v")
+    if version_result.returncode != 0 or actual_node_version != DEEPAGENTS_TYPESCRIPT_NODE_VERSION:
+        raise ValueError(
+            "TypeScript Deep Agents runs require Node "
+            f"{DEEPAGENTS_TYPESCRIPT_NODE_VERSION}; found {actual_node_version or 'unavailable'}"
+        )
+    runtime_root = DEEPAGENTS_TYPESCRIPT_RUNTIME_ROOT
+    worker = DEEPAGENTS_TYPESCRIPT_INSTALLED_WORKER
+    manifest_path = DEEPAGENTS_TYPESCRIPT_RUNTIME_MANIFEST
+    if (
+        runtime_root.is_symlink()
+        or not runtime_root.is_dir()
+        or worker.is_symlink()
+        or not worker.is_file()
+        or manifest_path.is_symlink()
+        or not manifest_path.is_file()
+    ):
+        raise ValueError(
+            "TypeScript runs require .deepagents-typescript-runtime from "
+            "scripts/install-deepagents-typescript-runtime.sh"
+        )
+    try:
+        manifest = read_json(manifest_path)
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise ValueError("TypeScript runtime manifest is invalid") from exc
+    expected = {
+        "schema_version": 1,
+        "sdk_language": "typescript",
+        "node_version": DEEPAGENTS_TYPESCRIPT_NODE_VERSION,
+        "runtime_version": DEEPAGENTS_SDK_VERSIONS["typescript"],
+        "worker_source_sha256": hashlib.sha256(
+            DEEPAGENTS_TYPESCRIPT_WORKER_SOURCE.read_bytes()
+        ).hexdigest(),
+        "package_lock_sha256": hashlib.sha256(
+            DEEPAGENTS_TYPESCRIPT_PACKAGE_LOCK.read_bytes()
+        ).hexdigest(),
+        "worker_sha256": DEEPAGENTS_TYPESCRIPT_WORKER_BUILD_SHA256,
+    }
+    if manifest != expected:
+        raise ValueError("TypeScript runtime manifest does not match trusted repository inputs")
+    if hashlib.sha256(worker.read_bytes()).hexdigest() != DEEPAGENTS_TYPESCRIPT_WORKER_BUILD_SHA256:
+        raise ValueError("TypeScript runtime worker build digest is invalid")
+    return runtime_node_path, worker
 
 
 def dump_policy() -> dict[str, Any]:
@@ -3930,8 +4163,24 @@ def dump_policy() -> dict[str, Any]:
             "clean_reapply_required": True,
         },
         "deepagents": {
-            "sdk_version": DEEPAGENTS_SDK_VERSION,
-            "worker": DEEPAGENTS_WORKER.relative_to(PACKAGE_ROOT).as_posix(),
+            "default_sdk_language": DEEPAGENTS_DEFAULT_SDK_LANGUAGE,
+            "runtimes": {
+                "python": {
+                    "sdk_version": DEEPAGENTS_SDK_VERSIONS["python"],
+                    "worker": DEEPAGENTS_WORKER.relative_to(PACKAGE_ROOT).as_posix(),
+                },
+                "typescript": {
+                    "sdk_version": DEEPAGENTS_SDK_VERSIONS["typescript"],
+                    "node_version": DEEPAGENTS_TYPESCRIPT_NODE_VERSION,
+                    "worker_source": DEEPAGENTS_TYPESCRIPT_WORKER_SOURCE.relative_to(
+                        PACKAGE_ROOT
+                    ).as_posix(),
+                    "package_lock": DEEPAGENTS_TYPESCRIPT_PACKAGE_LOCK.relative_to(
+                        PACKAGE_ROOT
+                    ).as_posix(),
+                    "worker_build_sha256": DEEPAGENTS_TYPESCRIPT_WORKER_BUILD_SHA256,
+                },
+            },
             "allowed_filesystem_tools": list(DEEPAGENTS_ALLOWED_FILESYSTEM_TOOLS),
             "maximum_attempt_seconds": int(MAX_DEEPAGENTS_ATTEMPT_SECONDS),
             "shell": False,
@@ -3975,7 +4224,13 @@ def parser() -> argparse.ArgumentParser:
     preflight_parser = subcommands.add_parser("preflight")
     preflight_parser.add_argument("--with-docker", action="store_true")
     preflight_parser.add_argument("--require-deepagents", action="store_true")
+    preflight_parser.add_argument(
+        "--deepagents-language",
+        choices=SUPPORTED_DEEPAGENTS_LANGUAGES,
+        default=DEEPAGENTS_DEFAULT_SDK_LANGUAGE,
+    )
     preflight_parser.add_argument("--deepagents-python", default=sys.executable)
+    preflight_parser.add_argument("--deepagents-node", default="node")
     preflight_parser.add_argument("--deepagents-provider", choices=SUPPORTED_DEEPAGENTS_PROVIDERS)
 
     run_parser = subcommands.add_parser("run")
@@ -4001,7 +4256,13 @@ def parser() -> argparse.ArgumentParser:
         "--deepagents-model",
         help="provider model identifier; Ollama tag separators are supported",
     )
+    run_parser.add_argument(
+        "--deepagents-language",
+        choices=SUPPORTED_DEEPAGENTS_LANGUAGES,
+        default=DEEPAGENTS_DEFAULT_SDK_LANGUAGE,
+    )
     run_parser.add_argument("--deepagents-python", default=sys.executable)
+    run_parser.add_argument("--deepagents-node", default="node")
     run_parser.add_argument("--deepagents-max-turns", type=int, default=20)
 
     verify_parser = subcommands.add_parser("verify")
@@ -4027,6 +4288,8 @@ def main() -> int:
             args.require_deepagents,
             args.deepagents_python,
             args.deepagents_provider,
+            args.deepagents_language,
+            args.deepagents_node,
         )
         print(json.dumps(result, indent=2, sort_keys=True))
         return 0 if result["ok"] else 1
@@ -4050,16 +4313,26 @@ def main() -> int:
                 )
                 return 2
             try:
-                runtime_python = qualified_deepagents_runtime(args.deepagents_python)
+                provider_options: dict[str, Any] = {
+                    "provider": args.deepagents_provider,
+                    "model": args.deepagents_model,
+                    "sdk_language": args.deepagents_language,
+                    "max_turns": args.deepagents_max_turns,
+                }
+                if args.deepagents_language == "python":
+                    provider_options["runtime_python"] = qualified_deepagents_runtime(
+                        args.deepagents_python
+                    )
+                else:
+                    runtime_node, worker = qualified_deepagents_typescript_runtime(
+                        args.deepagents_node
+                    )
+                    provider_options["runtime_node"] = runtime_node
+                    provider_options["typescript_worker"] = worker
+                candidate_provider = DeepAgentsCandidateProvider(**provider_options)
             except ValueError as exc:
                 print(str(exc), file=sys.stderr)
                 return 2
-            candidate_provider = DeepAgentsCandidateProvider(
-                provider=args.deepagents_provider,
-                model=args.deepagents_model,
-                runtime_python=runtime_python,
-                max_turns=args.deepagents_max_turns,
-            )
         run_dir, control = run_flow(
             args.scenario,
             with_docker=args.with_docker,

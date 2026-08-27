@@ -29,7 +29,7 @@ Both projects must preserve these invariants:
 | Intake validation | Repository, service, environment, and evidence-window checks | Equivalent validation | Matched |
 | Prompt-injection rejection | Rejected before evidence and patching | Equivalent regression | Matched |
 | Bounded evidence | Fixture broker, row/log caps, redaction | Equivalent fixture broker, caps, and redaction | Matched |
-| Candidate lifecycle | Fresh Hermes session per attempt | Fresh Deep Agents process per attempt | Matched semantically |
+| Candidate lifecycle | Fresh Hermes session per attempt | Fresh selected Python or TypeScript Deep Agents process per attempt | Matched semantically |
 | Agent tool boundary | Locked Hermes profile and Docker terminal | Exact six-tool SDK filesystem surface; no shell | Stronger SDK-specific reduction |
 | Persistence | No retained Hermes session | No checkpointer, store, memory, or retained session | Matched |
 | Patch authority | Host-derived Git patch | Controller-derived Git patch | Matched |
@@ -43,8 +43,8 @@ Both projects must preserve these invariants:
 | Delivery | File-based draft GitHub and notification mocks | Equivalent mocks with post-eligibility revocation | Matched and strengthened |
 | Cleanup | Controller-owned container and Compose cleanup | Pre-launch intents, exact ownership checks, restart recovery, pre-delivery and closeout cleanup | Strengthened |
 | Public safety | Public-surface scanner and ignored artifacts | Expanded scanner, credential shapes, irregular-file checks, and git-aware ignored-path checks | Matched and strengthened |
-| Dependency integrity | External Hermes CLI version checked at preflight | Python 3.11/3.12 transitive hash locks, PyPI provenance and license evidence, exact upstream tags, scoped source/document drift, and a network-none SDK smoke | Runtime-specific strengthening |
-| CI | Deterministic tests and SDK smoke | Python 3.11/3.12 deterministic and SDK matrices, pinned Ruff, direct graph smoke, and controller-to-worker end-to-end smoke | Matched and strengthened |
+| Dependency integrity | External Hermes CLI version checked at preflight | Python hash locks plus npm integrity lock, provenance/license/source evidence, compiled TypeScript worker digest, scoped upstream drift, and network-none SDK smokes | Runtime-specific strengthening |
+| CI | Deterministic tests and SDK smoke | Python 3.11/3.12 plus Node 22.23.2 matrices, pinned Ruff, direct graph smokes, and controller-to-worker end-to-end smokes | Matched and strengthened |
 | Customer adaptation | Public templates; private packs remain external | Equivalent customer-neutral templates and boundaries | Matched |
 | Costing | Evidence-backed model-cost guidance | Equivalent formulas and provider-rate structure | Matched |
 
@@ -52,13 +52,17 @@ Both projects must preserve these invariants:
 
 ### Candidate execution surface
 
-Hermes is integrated through its external CLI and an isolated profile. Its terminal work runs in a network-disabled Docker sandbox. Deep Agents is integrated directly through the Python SDK and receives no shell or execution tool. The SDK worker uses a disposable virtual-root filesystem, while candidate tests run later in the controller-owned Docker boundary.
+Hermes is integrated through its external CLI and an isolated profile. Its
+terminal work runs in a network-disabled Docker sandbox. Deep Agents is
+integrated directly through either supported SDK and receives no shell or
+execution tool. Both SDK workers use a disposable virtual-root filesystem,
+while candidate tests run later in the controller-owned Docker boundary.
 
 This is intentional. Adding a shell merely to resemble Hermes would enlarge the Deep Agents attack surface without improving the workflow.
 
 ### Network boundary
 
-Both real-model host processes may contact one explicitly selected inference provider. In the Deep Agents implementation, Python socket interception in the scripted smoke is a regression detector, not an OS sandbox. High-assurance unattended real-model use therefore remains gated on an outer egress-controlled worker boundary and durable supervision.
+Both real-model host processes may contact one explicitly selected inference provider. In the Deep Agents implementation, Python/Node network interception in the scripted smokes is a regression detector, not an OS sandbox. High-assurance unattended real-model use therefore remains gated on an outer egress-controlled worker boundary and durable supervision.
 
 ### Profiles and skills
 
@@ -81,7 +85,7 @@ Every release candidate must retain evidence for these shared gates:
 | Unit/adversarial suite | `./scripts/run-local.sh test` passes |
 | Retry behavior | `retry-success` fails first, succeeds second, and verifies independently |
 | Failure behavior | exhaustion, rejection, timeout, forged-success, crash, and cleanup regressions deny delivery |
-| Real SDK wiring | pinned direct smoke observes exactly six tools; full no-cost smoke crosses the controller, worker subprocess, graph, patch, Docker verifier, delivery, and cleanup with no transport |
+| Real SDK wiring | Python and TypeScript direct smokes observe exactly six tools; both no-cost paths cross the controller, worker subprocess, graph, patch, Docker verifier, delivery, and cleanup with no transport |
 | Path containment | out-of-scope and traversal read/write probes are denied |
 | Exact-candidate integrity | patch, candidate, verifier, receipt, clean-reapply, and delivery digests remain linked |
 | Service behavior | optional event-indexing fixture passes and leaves no project resources |

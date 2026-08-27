@@ -7,6 +7,9 @@
 - [ ] Run `python3 -I scripts/dependency_qualification.py` and confirm the
       committed policy, locks, provenance, license evidence, and source records
       validate offline.
+- [ ] Run `python3 -I scripts/typescript_dependency_qualification.py` and
+      confirm the npm lock, source tag, documentation, licenses, audit evidence,
+      Node version, and compiled-worker digest validate offline.
 - [ ] Run the read-only online qualification check; review all reported drift
       without automatically changing pins or trusted evidence.
 - [ ] Run `./scripts/run-local.sh dump-policy` and confirm the effective policy
@@ -16,9 +19,15 @@
 - [ ] Run `./scripts/run-local.sh test` twice from a clean clone.
 - [ ] Run the event-indexing Docker scenario and `verify --latest`.
 - [ ] Confirm pre-launch cleanup intents exist and no run container, network, or volume remains, including after a simulated controller crash.
-- [ ] Validate the exact Deep Agents SDK version, strict request/result schemas, six-tool contract, write-prefix enforcement, direct graph smoke, and full controller-to-worker no-transport smoke on Python 3.11 and 3.12.
+- [ ] Validate the exact Deep Agents SDK versions, strict request/result
+      schemas, six-tool contract, write-prefix enforcement, direct graph smoke,
+      and full controller-to-worker no-transport smoke on Python 3.11/3.12 and
+      Node 22.23.2.
 - [ ] Run `./scripts/run-network-isolated-sdk-smoke.sh`; confirm the network-none
       smoke succeeds and no ownership-labeled image or container remains.
+- [ ] Run `./scripts/run-network-isolated-typescript-sdk-smoke.sh`; confirm the
+      TypeScript network-none smoke succeeds and leaves no owned image or
+      container.
 - [ ] Run pinned Ruff lint and formatting checks.
 - [ ] Review pinned image indexes for supported architectures.
 - [ ] Review dependencies and update `THIRD_PARTY_NOTICES.md`.

@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-08-27T04:49:57Z",
+  "runtime": {
+    "node_version": "22.23.2",
+    "npm_version": "10.9.8",
+    "deepagents_version": "1.13.1"
+  },
+  "lock": {
+    "path": "typescript-runtime/package-lock.json",
+    "sha256": "e73d8edfb986bfa5b3ef6a97a45ebc642f61aab47940a62275128f6728445017",
+    "lockfile_version": 3,
+    "package_count": 82,
+    "registry": "https://registry.npmjs.org/",
+    "install_scripts": 0,
+    "license_counts": {
+      "Apache-2.0": 23,
+      "ISC": 3,
+      "MIT": 55,
+      "Unlicense": 1
+    }
+  },
+  "source": {
+    "repository": "https://github.com/langchain-ai/deepagentsjs",
+    "tag": "refs/tags/deepagents@1.13.1",
+    "tag_object": "f04ab62269356eaa5d400154dbf819371467cd4d",
+    "commit": "c0bc7692304f591526eadf9172c60a594f2a933f",
+    "tarball": "https://registry.npmjs.org/deepagents/-/deepagents-1.13.1.tgz",
+    "integrity": "sha512-DB8dkbrd4cqejroU90qAGTtY7ZvIchsMSaOMjE7TWnsi/6IrpBPxg3xN0Vxjuq/x8jkufkIqk3I57RbZmdSJFw=="
+  },
+  "documentation": [
+    {
+      "url": "https://docs.langchain.com/oss/deepagents/code/overview.md",
+      "bytes": 3909,
+      "sha256": "19ba3b0b542ad4909ec1d1e3706335fe58124906642aa66447d79e97442d268f"
+    },
+    {
+      "url": "https://docs.langchain.com/oss/javascript/deepagents/overview.md",
+      "bytes": 24849,
+      "sha256": "c0cf7966769cecafee1091a1b11ed2c1f0d008a13824c1aaa867fd90471c9274"
+    }
+  ],
+  "audit": {
+    "command": "npm audit --package-lock-only --omit=dev --json",
+    "production_vulnerabilities": 0
+  }
+}

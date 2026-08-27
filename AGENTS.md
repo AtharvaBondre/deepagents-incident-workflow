@@ -12,6 +12,7 @@ Run commands from the repository root:
 ./scripts/run-local.sh run --scenario retry-success --budget-seconds 120 --max-attempts 2
 ./scripts/run-local.sh verify --latest
 python3 -I scripts/dependency_qualification.py
+python3 -I scripts/typescript_dependency_qualification.py
 python3 scripts/check-public-surface.py
 git diff --check
 ```
@@ -27,11 +28,23 @@ For SDK-facing changes, also run:
 ./scripts/run-network-isolated-sdk-smoke.sh
 ```
 
+For TypeScript SDK-facing changes, also run:
+
+```bash
+./scripts/install-deepagents-typescript-runtime.sh
+node --test .deepagents-typescript-runtime/dist/deepagents_worker.test.js
+node .deepagents-typescript-runtime/dist/deepagents_sdk_smoke.js
+python3 scripts/deepagents_e2e_smoke.py --language typescript --node node
+./scripts/run-local.sh preflight --require-deepagents \
+  --deepagents-language typescript --deepagents-node node
+./scripts/run-network-isolated-typescript-sdk-smoke.sh
+```
+
 ## Always
 
 - Keep the repository customer-neutral and use only synthetic fixtures and disposable local services.
 - Keep Deep Agents and model adapters external and install them only from the qualified transitive hash locks. Preserve the recorded LangGraph, LangChain, and LangSmith versions, provenance, and license evidence.
-- Use the SDK-native worker as the integration surface and keep its tool surface to `ls`, `read_file`, `write_file`, `edit_file`, `glob`, and `grep`.
+- Use the Python or TypeScript SDK-native worker as the integration surface and keep both tool surfaces to `ls`, `read_file`, `write_file`, `edit_file`, `glob`, and `grep`.
 - Let `scripts/runner.py` own attempts, deadlines, policy, acceptance, artifact linkage, delivery eligibility, and cleanup.
 - Treat every model or fixture success claim as untrusted until deterministic verification accepts the exact candidate.
 - Keep continuation handoffs, phase plans, raw research workpads, reviewer notes,

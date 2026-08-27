@@ -16,6 +16,9 @@ __pycache__/
 *.pyo
 .venv/
 .deepagents-runtime/
+.deepagents-typescript-runtime/
+typescript-runtime/node_modules/
+typescript-runtime/dist/
 dist/
 build/
 *.egg-info/

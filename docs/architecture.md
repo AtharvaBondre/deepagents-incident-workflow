@@ -4,9 +4,9 @@
 
 The system has four trust classes:
 
-1. **Controller-owned policy:** repository identity, service/environment allowlists, path prefixes, evidence caps, required test argv, SDK pin, tool surface, attempt ceiling, and deadline.
+1. **Controller-owned policy:** repository identity, service/environment allowlists, path prefixes, evidence caps, required test argv, SDK-language pins, tool surface, attempt ceiling, and deadline.
 2. **Untrusted input:** incidents, evidence, prior diagnoses, model output, tool output, and candidate workspace files.
-3. **Untrusted candidate author:** either deterministic fixture patches or one fresh Deep Agents SDK worker.
+3. **Untrusted candidate author:** either deterministic fixture patches or one fresh Python or TypeScript Deep Agents SDK worker.
 4. **Trusted decision path:** controller patch derivation, policy validation, pinned verifier supervision, exact digest recreation, eligibility, draft rendering, and cleanup.
 
 The agent cannot modify policy, receipts, control state, artifacts, or delivery configuration through its filesystem tools.
@@ -35,15 +35,25 @@ The fixture provider applies reviewed patches through the same candidate contrac
 3. initializes a shadow Git repository outside the candidate-visible tree;
 4. gives a fresh worker an ephemeral home;
 5. sends a size-bounded, strict-field request described by `schemas/deepagents-request.schema.json`;
-6. starts `deepagents==0.7.8` with no checkpointer, store, memory, skills, or subagents;
-7. exposes only `ls`, `read_file`, `write_file`, `edit_file`, `glob`, and `grep` through `FilesystemBackend(virtual_mode=True)`;
+6. starts the selected exact SDK (`deepagents==0.7.8` for Python or
+   `deepagents@1.13.1` for TypeScript) with no checkpointer, store, memory,
+   skills, or subagents;
+7. exposes only `ls`, `read_file`, `write_file`, `edit_file`, `glob`, and `grep`
+   through an explicitly virtual-root `FilesystemBackend`;
 8. applies explicit write-prefix permissions followed by default-deny rules;
 9. starts the worker in an isolated process group and terminates that group on timeout;
-10. requires an exact-field completion record described by `schemas/deepagents-worker-result.schema.json`;
+10. requires an exact-field, language-bound completion record described by
+    `schemas/deepagents-worker-result.schema.json`;
 11. ignores model success claims and derives the patch from the shadow Git baseline;
 12. deletes the worker directory before writing final execution evidence.
 
-The host process may contact only the explicitly selected model provider. Only provider-specific credential names are forwarded; ambient base-URL and local-host overrides are stripped. Third-party Deep Agents profile entry points are rejected before profile bootstrap. The candidate cannot execute repository code or make tool-driven network calls.
+The host process may contact only the explicitly selected model provider. Only
+provider-specific credential names are forwarded; ambient base-URL,
+`NODE_OPTIONS`, `NODE_PATH`, npm configuration, and local-host overrides are
+absent. Python rejects third-party Deep Agents profile entry points before
+profile bootstrap; TypeScript uses only the repository-constructed profile and
+middleware. The candidate cannot execute repository code or make tool-driven
+network calls.
 
 ## Verification boundary
 
@@ -73,7 +83,8 @@ Each run records:
 - candidate request and contract;
 - exact patch and SHA-256;
 - candidate-workspace digest;
-- SDK worker version, source digest, capability flags, invocation identifier, and cleanup result when used;
+- SDK language and version, source/build/lock digests where applicable,
+  capability flags, invocation identifier, and cleanup result when used;
 - repository-test and trusted-verifier results;
 - clean-reapply verification;
 - local draft delivery payloads;

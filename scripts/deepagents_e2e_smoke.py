@@ -26,15 +26,29 @@ def _load_runner() -> Any:
     return module
 
 
-def run_smoke(runtime_python: str) -> dict[str, Any]:
+def run_smoke(
+    runtime_python: str,
+    *,
+    sdk_language: str = "python",
+    runtime_node: str = "node",
+) -> dict[str, Any]:
     runner = _load_runner()
-    provider = runner.DeepAgentsCandidateProvider(
-        provider="openai",
-        model="scripted-smoke",
-        runtime_python=runtime_python,
-        max_turns=10,
-        scripted_smoke=True,
-    )
+    provider_options: dict[str, Any] = {
+        "provider": "openai",
+        "model": "scripted-smoke",
+        "sdk_language": sdk_language,
+        "max_turns": 10,
+        "scripted_smoke": True,
+    }
+    if sdk_language == "python":
+        provider_options["runtime_python"] = runtime_python
+    elif sdk_language == "typescript":
+        qualified_node, worker = runner.qualified_deepagents_typescript_runtime(runtime_node)
+        provider_options["runtime_node"] = qualified_node
+        provider_options["typescript_worker"] = worker
+    else:
+        raise ValueError("SDK language must be python or typescript")
+    provider = runner.DeepAgentsCandidateProvider(**provider_options)
     with tempfile.TemporaryDirectory(prefix="daiw-e2e-sdk-") as temporary:
         run_dir, control = runner.run_flow(
             "retry-success",
@@ -52,6 +66,7 @@ def run_smoke(runtime_python: str) -> dict[str, Any]:
             and control.get("cleanup_complete") is True
             and not issues
             and execution.get("outcome") == "CANDIDATE_RETURNED"
+            and execution.get("sdk_language") == sdk_language
             and execution.get("scripted_smoke") is True
             and execution.get("model_transport") == "scripted-no-transport"
             and worker_result.get("network_attempts") == 0
@@ -61,7 +76,8 @@ def run_smoke(runtime_python: str) -> dict[str, Any]:
             "schema_version": 1,
             "at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "runtime": "deepagents-controller-e2e",
-            "runtime_version": runner.DEEPAGENTS_SDK_VERSION,
+            "sdk_language": sdk_language,
+            "runtime_version": runner.DEEPAGENTS_SDK_VERSIONS[sdk_language],
             "scenario": "retry-success",
             "candidate_source": control.get("candidate_source"),
             "attempts": control.get("attempts"),
@@ -75,7 +91,12 @@ def run_smoke(runtime_python: str) -> dict[str, Any]:
             "passed": passed,
         }
     ARTIFACTS.mkdir(exist_ok=True)
-    output = ARTIFACTS / "deepagents-e2e-smoke.json"
+    output_name = (
+        "deepagents-e2e-smoke.json"
+        if sdk_language == "python"
+        else "deepagents-typescript-e2e-smoke.json"
+    )
+    output = ARTIFACTS / output_name
     output.write_text(json.dumps(record, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return {"artifact": str(output), **record}
 
@@ -83,11 +104,18 @@ def run_smoke(runtime_python: str) -> dict[str, Any]:
 def parser() -> argparse.ArgumentParser:
     value = argparse.ArgumentParser(description=__doc__)
     value.add_argument("--python", default=sys.executable, dest="runtime_python")
+    value.add_argument("--node", default="node", dest="runtime_node")
+    value.add_argument("--language", choices=("python", "typescript"), default="python")
     return value
 
 
 def main() -> int:
-    result = run_smoke(parser().parse_args().runtime_python)
+    args = parser().parse_args()
+    result = run_smoke(
+        args.runtime_python,
+        sdk_language=args.language,
+        runtime_node=args.runtime_node,
+    )
     print(json.dumps(result, indent=2, sort_keys=True))
     return 0 if result["passed"] else 1
 

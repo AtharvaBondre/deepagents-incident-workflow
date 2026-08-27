@@ -23,7 +23,7 @@ Keep customer names, real identifiers, internal endpoints, credentials, and reta
 
 ## Change trusted policy
 
-Edit `config/workflow.json` to select the fixture repository contract, allowed service and environment, path prefixes, evidence caps, required test, pinned Deep Agents SDK/worker/tool contract, and hard limits.
+Edit `config/workflow.json` to select the fixture repository contract, allowed service and environment, path prefixes, evidence caps, required test, pinned Python and TypeScript Deep Agents runtime/tool contracts, and hard limits.
 
 Policy is trusted operator input. Do not derive these values from incident text or model output.
 
@@ -35,7 +35,7 @@ After editing policy, inspect the effective operator surface:
 
 Review the output before running a model. It is the compact product-facing view
 of what the controller will allow: repository, service, environment, paths,
-evidence caps, required test, Deep Agents SDK/worker/tool contract, limits, delivery authority, and
+evidence caps, required test, Deep Agents runtime/tool contracts, limits, delivery authority, and
 safety-mode pattern.
 
 For a customer pack, keep the public `config/workflow.json` as an example and
@@ -43,9 +43,14 @@ store the real policy in the private pack. Do not publish repository names,
 internal evidence sources, channels, reviewers, or provider decisions unless the
 owner has explicitly approved publication.
 
-## Add another language
+## Change the candidate repository language
 
-Replace the fixture repository and test command, then update the digest-pinned candidate-test image only if verification needs another runtime. Keep the same read-only inputs, controlled temporary storage, no network, no credential forwarding, and controller-derived patch policy.
+The `--deepagents-language` option selects the SDK worker implementation; it
+does not constrain the language of the candidate repository. Replace the
+fixture repository and test command, then update the digest-pinned
+candidate-test image only if verification needs another runtime. Keep the same
+read-only inputs, controlled temporary storage, no network, no credential
+forwarding, and controller-derived patch policy.
 
 Add policy tests for language-specific links, generated files, lockfiles, binary output, and test-command handling.
 
@@ -83,6 +88,10 @@ behavior, and message redaction have been reviewed.
 
 ## Real-model qualification
 
-Use the exact supported Deep Agents SDK in the repository-local runtime and an approved provider. Run repeated synthetic scenarios, including failed first attempts, malformed worker output, provider timeout, cleanup failure, and patch-policy denial.
+Use one exact supported Deep Agents SDK in its repository-local runtime and an
+approved provider. Qualify Python and TypeScript independently. Run repeated
+synthetic scenarios, including failed first attempts, malformed or
+wrong-language worker output, provider timeout, cleanup failure, and
+patch-policy denial.
 
 Do not make a credentialed model run a required public CI job. Keep it an explicit manual qualification step.

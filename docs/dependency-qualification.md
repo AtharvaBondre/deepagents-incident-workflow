@@ -1,10 +1,10 @@
 # Dependency qualification
 
-The optional Deep Agents runtime is reproducible for the supported Python 3.11
-and 3.12 targets without vendoring third-party code. The repository records the
-resolver policy, universal hash locks, exact package provenance, normalized
-license conclusions, source tags, relevant source-path commits, and the complete
-official Deep Agents documentation inventory.
+The optional Deep Agents runtimes are reproducible for Python 3.11/3.12 and
+TypeScript on Node 22.23.2 without vendoring third-party code. The repository
+records resolver policy, exact dependency locks and integrity, package
+provenance, license conclusions, source tags/commits, and reviewed official
+documentation snapshots.
 
 ## Trusted records
 
@@ -18,6 +18,13 @@ official Deep Agents documentation inventory.
   corresponding official PyPI release artifacts, license evidence, locked
   package versions, release uploads, Git tags, source-path commits, and all 40
   Deep Agents Python plus 16 Deep Agents Code documentation pages.
+- `typescript-runtime/package-lock.json` is a lockfile v3 containing exact
+  versions, official npm registry URLs, and SHA-512 integrity for all 82
+  TypeScript runtime/build packages. Lifecycle scripts are forbidden.
+- `security/typescript-dependency-qualification.json` binds that lock to Node
+  22.23.2, npm 10.9.8, `deepagents@1.13.1`, its official npm tarball,
+  `langchain-ai/deepagentsjs` tag and commit, license totals, audit result, and
+  the official JavaScript and Code overview pages.
 
 The installer separately compares every applicable installed distribution and
 version with the selected lock before declaring the runtime valid.
@@ -36,6 +43,8 @@ The offline check is authoritative for installation and CI:
 ```bash
 python3 -I scripts/dependency_qualification.py
 ./scripts/install-deepagents-runtime.sh
+python3 -I scripts/typescript_dependency_qualification.py
+./scripts/install-deepagents-typescript-runtime.sh
 ```
 
 The online check compares the trusted record with the current official PyPI,
@@ -43,6 +52,7 @@ GitHub, and LangChain documentation surfaces:
 
 ```bash
 python3 -I scripts/dependency_qualification.py --online
+python3 -I scripts/typescript_dependency_qualification.py --online
 ```
 
 Only HTTPS requests to the explicit PyPI, LangChain documentation, and tracked
@@ -51,8 +61,11 @@ before they are followed. Online drift is a review signal, never permission to
 change a pin automatically.
 
 The scheduled `Upstream drift` workflow runs that comparison and rebuilds the
-SDK smoke image. It has read-only repository permissions and cannot create a
-branch, pull request, release, or deployment.
+Python and TypeScript SDK smoke images. It has read-only repository permissions
+and cannot create a branch, pull request, release, or deployment. The
+TypeScript online check also reruns the production-only npm advisory query with
+the qualified Node and npm versions; a new advisory fails the drift job even
+when package versions and documentation are unchanged.
 
 ## Controlled upgrade
 
@@ -84,11 +97,19 @@ branch, pull request, release, or deployment.
 No dependency-update automation is authorized. A maintainer must own every
 review and promotion.
 
-This qualification is not a signed supply-chain attestation and does not scan
-Python packages for known vulnerabilities. It verifies the selected hashes
-against HTTPS-served official PyPI metadata, records license evidence, and
-detects reviewed upstream drift. Add signature or Python-vulnerability policy
-only as a separately designed gate; do not imply either from this record.
+For TypeScript upgrades, update exact versions in `package.json`, regenerate
+the npm lock using the selected npm version, and review every resolved URL,
+integrity, license, lifecycle-script flag, source tag, and provider adapter.
+Then update the qualification record, compile the worker, record its new digest
+in both workflow policies, rebuild the isolated runtime, and run the direct,
+end-to-end, and network-none TypeScript smokes. Never use a floating semver
+range or accept a local, Git, workspace, or alternate-registry dependency.
+
+This qualification is not a signed supply-chain attestation. Python evidence
+does not claim a vulnerability scan; TypeScript records the reviewed production
+`npm audit` result but does not treat it as a substitute for lock integrity or
+runtime isolation. Add stronger signature or vulnerability policy only as a
+separately designed gate.
 
 ## Rollback criteria
 
@@ -96,7 +117,8 @@ Keep the previous direct pins, both lockfiles, resolver policy, and qualificatio
 record as one atomic review unit. Revert that unit if any of these occur:
 
 - lock resolution, hash verification, provenance, or license validation fails;
-- Python 3.11, Python 3.12, or Linux wheel installation fails;
+- Python 3.11, Python 3.12, Node 22.23.2, npm 10.9.8, or locked package
+  installation fails;
 - the six-tool worker surface, path isolation, or no-transport behavior changes;
 - deterministic tests, trusted verification, clean reapply, or draft delivery
   linkage changes;

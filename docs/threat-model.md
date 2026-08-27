@@ -13,7 +13,7 @@
 - Incident text, evidence, model responses, tool output, candidate code, and candidate filesystem state are hostile.
 - Deep Agents and model providers are dependencies, not policy authorities.
 - A model can exploit every capability visible to it; prompt instructions are not containment.
-- Docker, the host kernel, Git, Python, and pinned third-party packages remain part of the trusted computing base.
+- Docker, the host kernel, Git, Python, Node, and pinned third-party packages remain part of the trusted computing base.
 - Local artifacts can be changed by a user with host access and are not cryptographic transparency records.
 
 ## Threats and mitigations
@@ -43,15 +43,15 @@
 | Controller crash leaves containers | Candidate-test/verifier containers and Compose projects have pre-launch cleanup intents that a later controller run validates before cleanup. |
 | Cleanup removes unrelated resources | Run IDs contain a controller-issued 128-bit nonce and are bound to the run-directory name; container and Compose targets are derived from run ID, attempt, and phase; image/config/working-directory/resource labels are checked before removal; artifact-supplied names cannot select a target. |
 | Delivery bypass | Delivery implementation writes local mocks only and rechecks verification linkage. |
-| Dependency behavior drifts | Exact SDK version, digest-pinned verifier image, worker digest, and no-cost tool-surface smoke. |
+| Dependency behavior drifts | Exact Python/npm locks, SDK/runtime versions, source and compiled-worker digests, scheduled official-source drift checks, digest-pinned smoke/verifier images, and no-cost tool-surface smokes. |
 
 ## Deep Agents-specific residual risks
 
-- `FilesystemBackend` containment is not OS process isolation. The model can only reach it through bounded file tools, but a vulnerability in Python or a dependency remains in the trusted computing base.
+- `FilesystemBackend` containment is not OS process isolation. The model can only reach it through bounded file tools, but a vulnerability in Python, Node, or a dependency remains in the trusted computing base.
 - The real-model worker must reach a selected inference provider. Provider processing, retention, compromise, and response behavior are outside this repository.
 - A hard controller crash can orphan the opt-in provider-connected SDK worker because process-group termination only runs on handled timeouts. Operators must inspect and stop an orphan before retrying; a durable worker supervisor or independent watchdog is required before unattended real-model operation.
 - Deep Agents is Beta and changes rapidly. Exact pins reduce drift but require deliberate upgrades.
-- Provider SDK initialization runs Python dependency code in the worker process. The ephemeral home and minimal environment reduce exposure; a future high-assurance mode should place the whole worker in an outbound allowlisted container or VM.
+- Provider SDK initialization runs third-party dependency code in the selected worker process. The ephemeral home and minimal environment reduce exposure; a future high-assurance mode should place the whole worker in an outbound allowlisted container or VM.
 - The pure-expression semantic verifier intentionally supports only the narrow synthetic fixture contract. Adapting it to general application code requires a new controller-owned verifier, not a broader `eval` or candidate import.
 - The default fixture path does not exercise a paid model. The no-cost smoke verifies SDK graph/tool wiring, not model quality.
 - The optional service verifier evaluates only the narrow candidate AST subset without importing candidate modules, then accesses an internal synthetic service network. It can veto but never authorize: the network-disabled controller verifier must pass first. Do not reuse this lane for customer code, live data, or real credentials without stronger isolation.

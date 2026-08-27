@@ -13,6 +13,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SKIP_PARTS = {
     ".deepagents-runtime",
+    ".deepagents-typescript-runtime",
     ".git",
     ".ruff_cache",
     ".venv",
@@ -20,6 +21,7 @@ SKIP_PARTS = {
     "__pycache__",
     "dist",
     "build",
+    "node_modules",
 }
 FORBIDDEN_INTERNAL_PATHS = {
     "docs/implementation-plan.md",
@@ -40,6 +42,7 @@ REQUIRED = {
     ".github/workflows/upstream-drift.yml",
     "config/workflow.json",
     "docker/deepagents-smoke/Dockerfile",
+    "docker/deepagents-typescript-smoke/Dockerfile",
     "docs/dependency-qualification.md",
     "docs/deep-agents-code.md",
     "docs/deep-agents-integration.md",
@@ -53,16 +56,27 @@ REQUIRED = {
     "security/dependency-policy.json",
     "security/dependency-qualification.json",
     "security/image-vulnerability-baseline.json",
+    "security/typescript-dependency-qualification.json",
     "scripts/check-image-vulnerabilities.py",
     "scripts/deepagents_e2e_smoke.py",
     "scripts/deepagents_sdk_smoke.py",
     "scripts/deepagents_worker.py",
     "scripts/dependency_qualification.py",
     "scripts/install-deepagents-runtime.sh",
+    "scripts/install-deepagents-typescript-runtime.sh",
     "scripts/refresh-dependency-locks.sh",
     "scripts/run-network-isolated-sdk-smoke.sh",
+    "scripts/run-network-isolated-typescript-sdk-smoke.sh",
     "scripts/runner.py",
     "scripts/validate_sdk_smoke_record.py",
+    "scripts/validate_typescript_sdk_smoke_record.py",
+    "scripts/typescript_dependency_qualification.py",
+    "typescript-runtime/package.json",
+    "typescript-runtime/package-lock.json",
+    "typescript-runtime/tsconfig.json",
+    "typescript-runtime/src/deepagents_sdk_smoke.ts",
+    "typescript-runtime/src/deepagents_worker.test.ts",
+    "typescript-runtime/src/deepagents_worker.ts",
 }
 SECRET_PATTERNS = (
     re.compile(r"AKIA[0-9A-Z]{16}"),
@@ -175,8 +189,8 @@ def main() -> int:
         template = json.loads((ROOT / "customer-pack-template" / "workflow.json").read_text())
         schema = json.loads((ROOT / "schemas" / "workflow.schema.json").read_text())
         expected_deepagents_fields = {
-            "sdk_version",
-            "worker",
+            "default_sdk_language",
+            "runtimes",
             "allowed_filesystem_tools",
             "maximum_attempt_seconds",
         }
@@ -189,12 +203,38 @@ def main() -> int:
         deepagents_schema = schema["properties"]["deepagents"]
         if set(deepagents_schema.get("required", [])) != expected_deepagents_fields:
             issues.append("workflow schema Deep Agents required fields are out of sync")
-        for field in ("sdk_version", "worker", "allowed_filesystem_tools"):
+        for field in (
+            "default_sdk_language",
+            "runtimes",
+            "allowed_filesystem_tools",
+            "maximum_attempt_seconds",
+        ):
             expected = workflow["deepagents"][field]
             if template["deepagents"].get(field) != expected:
                 issues.append(f"customer-pack Deep Agents {field} differs from public policy")
-            if deepagents_schema["properties"][field].get("const") != expected:
-                issues.append(f"workflow schema Deep Agents {field} differs from public policy")
+        if (
+            deepagents_schema["properties"]["default_sdk_language"].get("const")
+            != workflow["deepagents"]["default_sdk_language"]
+        ):
+            issues.append("workflow schema Deep Agents default language differs from policy")
+        if (
+            deepagents_schema["properties"]["allowed_filesystem_tools"].get("const")
+            != workflow["deepagents"]["allowed_filesystem_tools"]
+        ):
+            issues.append("workflow schema Deep Agents tool surface differs from policy")
+        runtime_schema = deepagents_schema["properties"]["runtimes"]
+        runtime_policy = workflow["deepagents"]["runtimes"]
+        if set(runtime_schema.get("required", [])) != set(runtime_policy):
+            issues.append("workflow schema Deep Agents runtimes differ from policy")
+        for language, fields in runtime_policy.items():
+            schema_fields = runtime_schema["properties"][language]
+            if set(schema_fields.get("required", [])) != set(fields):
+                issues.append(f"workflow schema {language} runtime fields differ from policy")
+            for field, expected in fields.items():
+                if field == "worker_build_sha256":
+                    continue
+                if schema_fields["properties"][field].get("const") != expected:
+                    issues.append(f"workflow schema {language} runtime {field} differs from policy")
     except (KeyError, TypeError, json.JSONDecodeError, OSError) as exc:
         issues.append(f"Deep Agents policy/schema consistency check failed: {type(exc).__name__}")
 
@@ -220,6 +260,7 @@ def main() -> int:
         expected_result_fields = {
             "schema_version",
             "runtime",
+            "sdk_language",
             "runtime_version",
             "provider_package",
             "provider_package_version",
@@ -253,13 +294,17 @@ def main() -> int:
         "scripts/run-local.sh",
         "scripts/bootstrap-pinned-images.sh",
         "scripts/install-deepagents-runtime.sh",
+        "scripts/install-deepagents-typescript-runtime.sh",
         "scripts/deepagents_e2e_smoke.py",
         "scripts/deepagents_sdk_smoke.py",
         "scripts/deepagents_worker.py",
         "scripts/dependency_qualification.py",
         "scripts/refresh-dependency-locks.sh",
         "scripts/run-network-isolated-sdk-smoke.sh",
+        "scripts/run-network-isolated-typescript-sdk-smoke.sh",
         "scripts/validate_sdk_smoke_record.py",
+        "scripts/validate_typescript_sdk_smoke_record.py",
+        "scripts/typescript_dependency_qualification.py",
         "scripts/check-public-surface.py",
         "scripts/check-image-vulnerabilities.py",
         "integration/postgres-init/001-incident-schema.sh",

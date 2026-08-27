@@ -25,7 +25,7 @@ labels, delivery channels, provider choices, or operational runbooks.
 - Log and database broker configuration.
 - Approved evidence views, labels, row limits, field allowlists, redaction rules,
   and timeouts.
-- The Deep Agents SDK version, provider, model, and retention policy approved by the
+- The selected Deep Agents SDK language/version, provider, model, and retention policy approved by the
   customer.
 - GitHub, GitLab, Slack, Teams, PagerDuty, Jira, or other delivery adapters.
 - Pilot runbooks, owner mappings, rollback contacts, and escalation rules.
@@ -60,7 +60,7 @@ any live credential or connector exists.
 2. Fill in `workflow.json` with the target repository, service, environment,
    path prefixes, test command, evidence caps, pinned Deep Agents worker/tool contract, and hard limits.
 3. Inspect the resolved policy with `./scripts/run-local.sh dump-policy` and
-   confirm the repository, paths, evidence caps, test command, Deep Agents SDK and tools,
+   confirm the repository, paths, evidence caps, test command, Deep Agents SDK runtimes and tools,
    attempt limits, and delivery authority match the intended mode.
 4. Add a synthetic incident that resembles one real class of issue without using
    production data.

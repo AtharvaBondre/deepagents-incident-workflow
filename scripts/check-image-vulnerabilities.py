@@ -17,6 +17,7 @@ BASELINE_PATH = ROOT / "security" / "image-vulnerability-baseline.json"
 PIN_SOURCES = (
     *sorted(ROOT.glob("compose*.yaml")),
     ROOT / "docker" / "deepagents-smoke" / "Dockerfile",
+    ROOT / "docker" / "deepagents-typescript-smoke" / "Dockerfile",
     ROOT / "docker" / "incident-poc" / "Dockerfile",
 )
 IMAGE_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._/-]*(?::[A-Za-z0-9._-]+)?@sha256:[0-9a-f]{64}")

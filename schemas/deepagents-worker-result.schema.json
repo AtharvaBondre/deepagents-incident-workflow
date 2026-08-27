@@ -4,9 +4,26 @@
   "title": "Deep Agents worker result",
   "type": "object",
   "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": { "sdk_language": { "const": "python" } },
+        "required": ["sdk_language"]
+      },
+      "then": { "properties": { "runtime_version": { "const": "0.7.8" } } }
+    },
+    {
+      "if": {
+        "properties": { "sdk_language": { "const": "typescript" } },
+        "required": ["sdk_language"]
+      },
+      "then": { "properties": { "runtime_version": { "const": "1.13.1" } } }
+    }
+  ],
   "required": [
     "schema_version",
     "runtime",
+    "sdk_language",
     "runtime_version",
     "provider_package",
     "provider_package_version",
@@ -22,7 +39,8 @@
   "properties": {
     "schema_version": { "const": 1 },
     "runtime": { "const": "deepagents" },
-    "runtime_version": { "const": "0.7.8" },
+    "sdk_language": { "enum": ["python", "typescript"] },
+    "runtime_version": { "enum": ["0.7.8", "1.13.1"] },
     "provider_package": { "type": "string", "minLength": 1, "maxLength": 128 },
     "provider_package_version": { "type": "string", "minLength": 1, "maxLength": 64 },
     "profile_plugins_enabled": { "const": false },

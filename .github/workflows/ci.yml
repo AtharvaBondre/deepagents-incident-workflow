@@ -44,7 +44,9 @@ jobs:
         run: python scripts/check-public-surface.py
 
       - name: Validate qualified dependency evidence offline
-        run: python -I scripts/dependency_qualification.py
+        run: |
+          python -I scripts/dependency_qualification.py
+          python -I scripts/typescript_dependency_qualification.py
 
       - name: Validate prerequisites and inspect effective policy
         run: |
@@ -124,3 +126,64 @@ jobs:
 
       - name: Build the locked SDK and prove runtime network isolation
         run: ./scripts/run-network-isolated-sdk-smoke.sh
+
+  deepagents-typescript-sdk-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Set up qualified Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+
+      - name: Set up qualified Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "22.23.2"
+          cache: npm
+          cache-dependency-path: typescript-runtime/package-lock.json
+
+      - name: Install and validate the locked TypeScript SDK
+        run: |
+          python3 -I scripts/typescript_dependency_qualification.py
+          ./scripts/install-deepagents-typescript-runtime.sh
+          node --test .deepagents-typescript-runtime/dist/deepagents_worker.test.js
+
+      - name: Bootstrap digest-pinned candidate image
+        run: ./scripts/bootstrap-pinned-images.sh sandbox
+
+      - name: Validate the TypeScript worker and controller path
+        run: |
+          ./scripts/run-local.sh preflight \
+            --require-deepagents \
+            --deepagents-language typescript \
+            --deepagents-node node
+          node .deepagents-typescript-runtime/dist/deepagents_sdk_smoke.js
+          python3 scripts/deepagents_e2e_smoke.py \
+            --language typescript \
+            --node node
+
+  network-isolated-typescript-sdk-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Set up qualified Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+
+      - name: Bootstrap digest-pinned sandbox images
+        run: ./scripts/bootstrap-pinned-images.sh sandbox
+
+      - name: Build the locked TypeScript SDK and prove network isolation
+        run: ./scripts/run-network-isolated-typescript-sdk-smoke.sh

@@ -1,6 +1,9 @@
 .git
 .github
 .deepagents-runtime
+.deepagents-typescript-runtime
+typescript-runtime/node_modules
+typescript-runtime/dist
 .ruff_cache
 .venv
 artifacts

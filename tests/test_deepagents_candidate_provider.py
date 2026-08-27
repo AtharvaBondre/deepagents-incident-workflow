@@ -24,13 +24,15 @@ worker = importlib.util.module_from_spec(WORKER_SPEC)
 WORKER_SPEC.loader.exec_module(worker)
 
 
-def worker_result(invocation_id: str, **changes: object) -> dict:
+def worker_result(invocation_id: str, sdk_language: str = "python", **changes: object) -> dict:
+    provider_package, provider_version = runner.DEEPAGENTS_PROVIDER_PACKAGES[sdk_language]["openai"]
     value = {
         "schema_version": 1,
         "runtime": "deepagents",
-        "runtime_version": runner.DEEPAGENTS_SDK_VERSION,
-        "provider_package": "langchain-openai",
-        "provider_package_version": "1.6.0",
+        "sdk_language": sdk_language,
+        "runtime_version": runner.DEEPAGENTS_SDK_VERSIONS[sdk_language],
+        "provider_package": provider_package,
+        "provider_package_version": provider_version,
         "profile_plugins_enabled": False,
         "model_transport": "provider",
         "network_attempts": None,
@@ -59,7 +61,7 @@ class DeepAgentsCandidateProviderTests(unittest.TestCase):
         )
         return {"artifact_dir": artifact_dir, "packet": packet}
 
-    def verified_deepagents_run(self, artifact_root: Path) -> Path:
+    def verified_deepagents_run(self, artifact_root: Path, sdk_language: str = "python") -> Path:
         patch_payload = (runner.FIXTURES / "patches" / "correct.patch").read_bytes()
         patch_sha256 = runner.hashlib.sha256(patch_payload).hexdigest()
         changed_paths = runner.validate_deepagents_patch_bytes(patch_payload)[1]
@@ -148,39 +150,52 @@ class DeepAgentsCandidateProviderTests(unittest.TestCase):
                 "candidate_digest": candidate_digest,
             },
         )
-        runner.write_json(
-            run_dir / "attempt-1-deepagents-execution.json",
-            {
-                "schema_version": 1,
-                "kind": "deepagents-candidate-execution",
-                "attempt": 1,
-                "invocation_id": invocation_id,
-                "provider": "openai",
-                "model": "example-model",
-                "model_spec_sha256": runner.hashlib.sha256(b"openai:example-model").hexdigest(),
-                "runtime_version": runner.DEEPAGENTS_SDK_VERSION,
-                "worker_sha256": runner.hashlib.sha256(
-                    runner.DEEPAGENTS_WORKER.read_bytes()
-                ).hexdigest(),
-                "allowed_filesystem_tools": list(runner.DEEPAGENTS_ALLOWED_FILESYSTEM_TOOLS),
-                "memory_enabled": False,
-                "checkpointer_enabled": False,
-                "store_enabled": False,
-                "subagents_enabled": False,
-                "shell_enabled": False,
-                "langsmith_tracing_enabled": False,
-                "profile_plugins_enabled": False,
-                "scripted_smoke": False,
-                "model_transport": "provider",
-                "fresh_session": True,
-                "controller_is_sole_acceptor": True,
-                "worker_result": worker_result(invocation_id),
-                "outcome": "CANDIDATE_RETURNED",
-                "patch_sha256": patch_sha256,
-                "candidate_digest": candidate_digest,
-                "cleanup": {"complete": True, "worker_directory_removed": True},
-            },
-        )
+        execution = {
+            "schema_version": 1,
+            "kind": "deepagents-candidate-execution",
+            "attempt": 1,
+            "invocation_id": invocation_id,
+            "provider": "openai",
+            "model": "example-model",
+            "sdk_language": sdk_language,
+            "model_spec_sha256": runner.hashlib.sha256(b"openai:example-model").hexdigest(),
+            "runtime_version": runner.DEEPAGENTS_SDK_VERSIONS[sdk_language],
+            "worker_sha256": (
+                runner.hashlib.sha256(runner.DEEPAGENTS_WORKER.read_bytes()).hexdigest()
+                if sdk_language == "python"
+                else runner.DEEPAGENTS_TYPESCRIPT_WORKER_BUILD_SHA256
+            ),
+            "allowed_filesystem_tools": list(runner.DEEPAGENTS_ALLOWED_FILESYSTEM_TOOLS),
+            "memory_enabled": False,
+            "checkpointer_enabled": False,
+            "store_enabled": False,
+            "subagents_enabled": False,
+            "shell_enabled": False,
+            "langsmith_tracing_enabled": False,
+            "profile_plugins_enabled": False,
+            "scripted_smoke": False,
+            "model_transport": "provider",
+            "fresh_session": True,
+            "controller_is_sole_acceptor": True,
+            "worker_result": worker_result(invocation_id, sdk_language),
+            "outcome": "CANDIDATE_RETURNED",
+            "patch_sha256": patch_sha256,
+            "candidate_digest": candidate_digest,
+            "cleanup": {"complete": True, "worker_directory_removed": True},
+        }
+        if sdk_language == "typescript":
+            execution.update(
+                {
+                    "node_version": runner.DEEPAGENTS_TYPESCRIPT_NODE_VERSION,
+                    "worker_source_sha256": runner.hashlib.sha256(
+                        runner.DEEPAGENTS_TYPESCRIPT_WORKER_SOURCE.read_bytes()
+                    ).hexdigest(),
+                    "package_lock_sha256": runner.hashlib.sha256(
+                        runner.DEEPAGENTS_TYPESCRIPT_PACKAGE_LOCK.read_bytes()
+                    ).hexdigest(),
+                }
+            )
+        runner.write_json(run_dir / "attempt-1-deepagents-execution.json", execution)
         runner.write_json(
             run_dir / "attempt-1-result.json",
             {"attempt": 1, "candidate_digest": candidate_digest, "test": attempt_test},
@@ -384,6 +399,11 @@ class DeepAgentsCandidateProviderTests(unittest.TestCase):
                     "ANTHROPIC_API_KEY": "synthetic-anthropic-key",
                     "OLLAMA_HOST": "http://untrusted.invalid",
                     "GITHUB_TOKEN": "synthetic-github-token",
+                    "NODE_OPTIONS": "--require=/tmp/untrusted.js",
+                    "NODE_PATH": "/tmp/untrusted-node-modules",
+                    "NPM_CONFIG_REGISTRY": "https://untrusted.invalid",
+                    "TS_NODE_PROJECT": "/tmp/untrusted-tsconfig.json",
+                    "TSX_TSCONFIG_PATH": "/tmp/untrusted-tsconfig.json",
                     "PATH": "/usr/bin",
                 },
                 clear=True,
@@ -398,6 +418,11 @@ class DeepAgentsCandidateProviderTests(unittest.TestCase):
         self.assertNotIn("OPENAI_BASE_URL", environment)
         self.assertNotIn("OLLAMA_HOST", environment)
         self.assertNotIn("GITHUB_TOKEN", environment)
+        self.assertNotIn("NODE_OPTIONS", environment)
+        self.assertNotIn("NODE_PATH", environment)
+        self.assertNotIn("NPM_CONFIG_REGISTRY", environment)
+        self.assertNotIn("TS_NODE_PROJECT", environment)
+        self.assertNotIn("TSX_TSCONFIG_PATH", environment)
         self.assertEqual(environment["LANGSMITH_TRACING"], "false")
         with (
             tempfile.TemporaryDirectory() as temporary,
@@ -571,6 +596,64 @@ class DeepAgentsCandidateProviderTests(unittest.TestCase):
             self.assertEqual(command[command.index("--model") + 1], "example-model")
             self.assertNotIn("dcode", command)
             self.assertNotIn("--scripted-smoke", command)
+
+    def test_typescript_provider_uses_the_same_controller_boundary(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            artifact_dir = root / "run"
+            artifact_dir.mkdir()
+            workspace = runner.create_workspace(artifact_dir, "attempt-1")
+            worker_path = root / "deepagents_worker.js"
+            worker_path.write_text("// synthetic executable fixture\n", encoding="utf-8")
+            provider = runner.DeepAgentsCandidateProvider(
+                provider="openai",
+                model="example-model",
+                sdk_language="typescript",
+                runtime_node=sys.executable,
+                typescript_worker=worker_path,
+            )
+            observed: dict[str, object] = {}
+
+            def invoke(args, *, cwd, environment, timeout):
+                del cwd, timeout
+                observed["args"] = args
+                observed["environment"] = environment
+                sandbox = Path(args[args.index("--workspace") + 1])
+                result_path = Path(args[args.index("--result") + 1])
+                invocation_id = args[args.index("--invocation-id") + 1]
+                subject = sandbox / "app" / "subject.py"
+                subject.write_text(
+                    subject.read_text(encoding="utf-8").replace(
+                        "    return value.strip()\n",
+                        '    return " ".join(value.split()).lower()\n',
+                    ),
+                    encoding="utf-8",
+                )
+                runner.write_json(
+                    result_path,
+                    worker_result(invocation_id, "typescript"),
+                )
+                return subprocess.CompletedProcess(args, 0, "", "")
+
+            with mock.patch.object(runner, "run_deepagents_process", side_effect=invoke):
+                candidate = provider.create_candidate(
+                    attempt=1,
+                    workspace=workspace,
+                    deadline=time.monotonic() + 30,
+                    request=self.fixture_context(artifact_dir),
+                )
+
+            self.assertEqual(candidate.record["changed_paths"], ["app/subject.py"])
+            command = observed["args"]
+            self.assertEqual(command[0], str(Path(sys.executable).absolute()))
+            self.assertEqual(command[1], "--no-global-search-paths")
+            self.assertEqual(command[2], str(worker_path))
+            self.assertNotIn("-I", command)
+            execution = runner.read_json(artifact_dir / "attempt-1-deepagents-execution.json")
+            self.assertEqual(execution["sdk_language"], "typescript")
+            self.assertEqual(execution["runtime_version"], "1.13.1")
+            self.assertEqual(execution["node_version"], "22.23.2")
+            self.assertTrue(execution["cleanup"]["complete"])
 
     def test_scripted_smoke_invocation_strips_provider_credentials(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -824,6 +907,58 @@ class DeepAgentsCandidateProviderTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             self.assertEqual(runner.verify_run(self.verified_deepagents_run(Path(temporary))), [])
 
+    def test_verified_typescript_artifact_chain_is_accepted(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            run_dir = self.verified_deepagents_run(Path(temporary), "typescript")
+            self.assertEqual(runner.verify_run(run_dir), [])
+
+    def test_typescript_artifact_chain_rejects_worker_build_tampering(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            run_dir = self.verified_deepagents_run(Path(temporary), "typescript")
+            execution_path = run_dir / "attempt-1-deepagents-execution.json"
+            execution = runner.read_json(execution_path)
+            execution["worker_sha256"] = "0" * 64
+            runner.write_json(execution_path, execution)
+            self.assertIn(
+                "Deep Agents execution worker digest is invalid",
+                runner.verify_run(run_dir),
+            )
+
+    def test_typescript_artifact_chain_rejects_runtime_linkage_tampering(self) -> None:
+        cases = (
+            ("node_version", "0.0.0", "Deep Agents execution Node version is invalid"),
+            (
+                "worker_source_sha256",
+                "0" * 64,
+                "Deep Agents execution worker source digest is invalid",
+            ),
+            (
+                "package_lock_sha256",
+                "0" * 64,
+                "Deep Agents execution package lock digest is invalid",
+            ),
+        )
+        for field, value, expected in cases:
+            with self.subTest(field=field), tempfile.TemporaryDirectory() as temporary:
+                run_dir = self.verified_deepagents_run(Path(temporary), "typescript")
+                execution_path = run_dir / "attempt-1-deepagents-execution.json"
+                execution = runner.read_json(execution_path)
+                execution[field] = value
+                runner.write_json(execution_path, execution)
+                self.assertIn(expected, runner.verify_run(run_dir))
+
+    def test_typescript_artifact_chain_rejects_wrong_worker_language(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            run_dir = self.verified_deepagents_run(Path(temporary), "typescript")
+            execution_path = run_dir / "attempt-1-deepagents-execution.json"
+            execution = runner.read_json(execution_path)
+            execution["worker_result"]["sdk_language"] = "python"
+            runner.write_json(execution_path, execution)
+            self.assertIn(
+                "Deep Agents execution worker result is invalid",
+                runner.verify_run(run_dir),
+            )
+
     def test_real_model_verifier_detects_linkage_tampering(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             run_dir = self.verified_deepagents_run(Path(temporary))
@@ -940,6 +1075,25 @@ class DeepAgentsCandidateProviderTests(unittest.TestCase):
         self.assertEqual(selected.deepagents_provider, "openai")
         self.assertEqual(selected.deepagents_model, "example-model")
         self.assertEqual(selected.deepagents_python, sys.executable)
+        self.assertEqual(selected.deepagents_language, "python")
+
+        typescript = runner.parser().parse_args(
+            [
+                "run",
+                "--candidate-provider",
+                "deepagents",
+                "--deepagents-provider",
+                "openai",
+                "--deepagents-model",
+                "example-model",
+                "--deepagents-language",
+                "typescript",
+                "--deepagents-node",
+                "node",
+            ]
+        )
+        self.assertEqual(typescript.deepagents_language, "typescript")
+        self.assertEqual(typescript.deepagents_node, "node")
 
     def test_cli_forwards_runtime_to_provider(self) -> None:
         provider = mock.Mock(source="deepagents-real-model")
@@ -985,6 +1139,7 @@ class DeepAgentsCandidateProviderTests(unittest.TestCase):
         constructor.assert_called_once_with(
             provider="openai",
             model="example-model",
+            sdk_language="python",
             runtime_python=sys.executable,
             max_turns=20,
         )

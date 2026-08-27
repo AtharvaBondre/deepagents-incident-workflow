@@ -12,7 +12,7 @@ Include the affected revision, reproduction steps, impact, and any suggested mit
 
 ## Security boundary
 
-This project is an experimental local reference implementation, not a production incident responder. Its default paths use synthetic data, fixture repositories, network-disabled candidate-test and verifier containers, file-based delivery mocks, and no live-system connector. The optional Deep Agents editor is a fresh, capability-limited host subprocess; it is not an OS network sandbox and may contact only the explicitly selected model provider.
+This project is an experimental local reference implementation, not a production incident responder. Its default paths use synthetic data, fixture repositories, network-disabled candidate-test and verifier containers, file-based delivery mocks, and no live-system connector. The optional Python or TypeScript Deep Agents editor is a fresh, capability-limited host subprocess; it is not an OS network sandbox and may contact only the explicitly selected model provider.
 
 A deployment that adds production evidence, source-control, notification, or cloud connectors creates a new security boundary and requires an independent review.
 

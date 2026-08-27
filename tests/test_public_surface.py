@@ -74,6 +74,17 @@ class PublicSurfaceTests(unittest.TestCase):
                 discovered = checker.source_files()
             self.assertIn(runtime, discovered)
 
+    def test_ignored_typescript_runtime_symlink_is_still_inspected(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            target = root / "target"
+            target.mkdir()
+            runtime = root / ".deepagents-typescript-runtime"
+            runtime.symlink_to(target, target_is_directory=True)
+            with mock.patch.object(checker, "ROOT", root):
+                discovered = checker.source_files()
+            self.assertIn(runtime, discovered)
+
     def test_common_provider_token_shapes_are_detected(self) -> None:
         examples = (
             "ASIA" + "E" * 16,

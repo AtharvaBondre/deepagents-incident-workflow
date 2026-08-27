@@ -55,6 +55,7 @@ WORKER_RESULT_FIELDS = frozenset(
     {
         "schema_version",
         "runtime",
+        "sdk_language",
         "runtime_version",
         "provider_package",
         "provider_package_version",
@@ -414,6 +415,7 @@ def run(
     record = {
         "schema_version": 1,
         "runtime": "deepagents",
+        "sdk_language": "python",
         "runtime_version": EXPECTED_DEEPAGENTS_VERSION,
         "provider_package": provider_package,
         "provider_package_version": actual_provider_version,

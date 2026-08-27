@@ -26,10 +26,10 @@ substitute for process isolation or an exact tool allowlist.
 
 ## Why the SDK is safer here
 
-The Python SDK allows the worker to construct the exact middleware, backend,
-permission rules, and tool set in code. That makes the effective surface
-testable: the SDK smoke fails unless it observes precisely the six approved
-filesystem tools and no network attempt.
+The Python and TypeScript SDKs allow each worker to construct the exact
+middleware, backend, permission rules, and tool set in code. That makes the
+effective surface testable: both SDK smokes fail unless they observe precisely
+the six approved filesystem tools and no network attempt.
 
 This is not a claim that the SDK is universally better than `dcode`. The CLI is
 the richer interactive product; the SDK is the better fit for this specific

@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- Added first-class TypeScript SDK support on Node 22.23.2 with
+  `deepagents@1.13.1`, the same six-tool boundary and controller-owned
+  verification path as Python, an integrity-locked npm graph, a digest-bound
+  compiled worker, direct and end-to-end no-transport smokes, and an
+  unprivileged network-none Docker smoke.
+- Added exact provider-model construction for tagged Ollama identifiers,
+  removed subagent middleware instead of merely hiding its tool, pruned
+  TypeScript build dependencies from runtime images, installed no-transport
+  interception before SDK imports with fetch, socket, and DNS coverage, and
+  added a scheduled live production npm advisory check.
 - Documented why the direct SDK is the supported integration and kept the
   optional `deepagents-code==0.1.62` lane disabled because the current CLI
   cannot satisfy the complete ambient-state and network-isolation contract.
