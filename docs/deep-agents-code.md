@@ -8,7 +8,7 @@ capabilities.
 
 ## Current compatibility status
 
-The reviewed `deepagents-code==0.1.62` CLI is not used by the workflow. Its
+The reviewed `deepagents-code==0.1.65` CLI is not used by the workflow. Its
 normal runtime includes a local client/server process, SQLite-backed sessions,
 memory and instruction discovery, skills, a general-purpose subagent, goal
 middleware, `fetch_url`, `get_current_thread_id`, hooks, plugins, and update
@@ -53,5 +53,5 @@ the SDK remains the supported integration and the CLI lane remains disabled.
 ## Upstream references
 
 - [Deep Agents Code overview](https://docs.langchain.com/oss/deepagents/code/overview)
-- [`deepagents-code` 0.1.62 source](https://github.com/langchain-ai/deepagents/tree/dc27a2fc295854b41d59fe28d1568275b0c33767/libs/code)
-- [Upstream threat model](https://github.com/langchain-ai/deepagents/blob/dc27a2fc295854b41d59fe28d1568275b0c33767/libs/code/THREAT_MODEL.md)
+- [`deepagents-code` 0.1.65 source](https://github.com/langchain-ai/deepagents/tree/a233ded7cffd4cc5c81e5767780bf93472dd8fe7/libs/code)
+- [Upstream threat model](https://github.com/langchain-ai/deepagents/blob/a233ded7cffd4cc5c81e5767780bf93472dd8fe7/libs/code/THREAT_MODEL.md)

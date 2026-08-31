@@ -17,12 +17,12 @@ documentation snapshots.
 - `security/dependency-qualification.json` binds both lock digests to the
   corresponding official PyPI release artifacts, license evidence, locked
   package versions, release uploads, Git tags, source-path commits, and all 40
-  Deep Agents Python plus 16 Deep Agents Code documentation pages.
+  Deep Agents Python plus 17 Deep Agents Code documentation pages.
 - `typescript-runtime/package-lock.json` is a lockfile v3 containing exact
   versions, official npm registry URLs, and SHA-512 integrity for all 82
   TypeScript runtime/build packages. Lifecycle scripts are forbidden.
 - `security/typescript-dependency-qualification.json` binds that lock to Node
-  22.23.2, npm 10.9.8, `deepagents@1.13.1`, its official npm tarball,
+  22.23.2, npm 10.9.8, `deepagents@1.13.2`, its official npm tarball,
   `langchain-ai/deepagentsjs` tag and commit, license totals, audit result, and
   the official JavaScript and Code overview pages.
 
@@ -54,6 +54,11 @@ GitHub, and LangChain documentation surfaces:
 python3 -I scripts/dependency_qualification.py --online
 python3 -I scripts/typescript_dependency_qualification.py --online
 ```
+
+Set `GITHUB_TOKEN` from a secret manager when GitHub's unauthenticated API
+quota is insufficient. The qualification clients send it only to
+`api.github.com`; package registries, documentation hosts, redirects, and
+candidate runtimes never receive it.
 
 Only HTTPS requests to the explicit PyPI, LangChain documentation, and tracked
 LangChain GitHub repository paths are permitted. Redirect targets are checked

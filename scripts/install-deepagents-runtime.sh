@@ -117,9 +117,9 @@ if actual != expected:
     )
 
 expected_direct = {
-    "deepagents": "0.7.8",
-    "langchain-anthropic": "1.6.1",
-    "langchain-google-genai": "4.3.5",
+    "deepagents": "0.7.11",
+    "langchain-anthropic": "1.7.0",
+    "langchain-google-genai": "4.3.7",
     "langchain-ollama": "1.1.0",
     "langchain-openai": "1.6.0",
 }

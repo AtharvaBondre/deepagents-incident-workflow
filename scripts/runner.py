@@ -319,8 +319,8 @@ DEEPAGENTS_PROVIDER_OPTIONAL_ENVIRONMENT = {
 }
 DEEPAGENTS_PROVIDER_PACKAGES = {
     "python": {
-        "anthropic": ("langchain-anthropic", "1.6.1"),
-        "google_genai": ("langchain-google-genai", "4.3.5"),
+        "anthropic": ("langchain-anthropic", "1.7.0"),
+        "google_genai": ("langchain-google-genai", "4.3.7"),
         "ollama": ("langchain-ollama", "1.1.0"),
         "openai": ("langchain-openai", "1.6.0"),
     },

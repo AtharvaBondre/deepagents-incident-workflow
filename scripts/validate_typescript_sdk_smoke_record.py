@@ -25,6 +25,7 @@ EXPECTED_FIELDS = {
     "network_attempts",
     "observed_tools",
     "forbidden_tools_absent",
+    "forbidden_tool_calls_rejected",
     "workspace_edit_succeeded",
     "out_of_scope_write_denied",
     "traversal_write_denied",
@@ -34,6 +35,7 @@ EXPECTED_FIELDS = {
 }
 TRUE_FIELDS = (
     "forbidden_tools_absent",
+    "forbidden_tool_calls_rejected",
     "workspace_edit_succeeded",
     "out_of_scope_write_denied",
     "traversal_write_denied",
@@ -63,7 +65,7 @@ def validate_record(record: Any) -> list[str]:
     expected_strings = {
         "runtime": "deepagents",
         "sdk_language": "typescript",
-        "runtime_version": "1.13.1",
+        "runtime_version": "1.13.2",
         "node_version": "22.23.2",
         "model": "openai:scripted-smoke (scripted, no transport)",
         "profile_provider": "openai",

@@ -205,6 +205,19 @@ class DependencyQualificationTests(unittest.TestCase):
             with self.subTest(url=url), self.assertRaises(qualification.QualificationError):
                 qualification._validated_upstream_url(url)
 
+    def test_github_token_is_sent_only_to_the_github_api(self) -> None:
+        with mock.patch.dict(qualification.os.environ, {"GITHUB_TOKEN": "synthetic-token"}):
+            api_headers = qualification._request_headers(
+                "https://api.github.com/repos/langchain-ai/deepagents/commits"
+            )
+            pypi_headers = qualification._request_headers("https://pypi.org/pypi/deepagents/json")
+            docs_headers = qualification._request_headers(
+                "https://docs.langchain.com/oss/python/deepagents/overview.md"
+            )
+        self.assertEqual(api_headers["Authorization"], "Bearer synthetic-token")
+        self.assertNotIn("Authorization", pypi_headers)
+        self.assertNotIn("Authorization", docs_headers)
+
     def test_redirect_is_rejected_before_following_an_unapproved_host(self) -> None:
         handler = qualification.ValidatingRedirectHandler()
         request = urllib.request.Request("https://docs.langchain.com/llms.txt")
@@ -217,6 +230,21 @@ class DependencyQualificationTests(unittest.TestCase):
                 {},
                 "https://example.com/untrusted",
             )
+
+    def test_redirect_strips_github_authorization_before_another_host(self) -> None:
+        handler = qualification.ValidatingRedirectHandler()
+        request = urllib.request.Request(
+            "https://api.github.com/repos/langchain-ai/deepagents/commits",
+            headers={"Authorization": "Bearer synthetic-token"},
+        )
+        for target in (
+            "https://raw.githubusercontent.com/langchain-ai/deepagents/main/README.md",
+            "https://docs.langchain.com/oss/python/deepagents/overview.md",
+        ):
+            with self.subTest(target=target):
+                redirected = handler.redirect_request(request, None, 302, "Found", {}, target)
+                self.assertIsNotNone(redirected)
+                self.assertIsNone(redirected.get_header("Authorization"))
 
 
 if __name__ == "__main__":

@@ -2,8 +2,8 @@
 
 ## Qualification target
 
-The workflow targets Python 3.11/3.12 with `deepagents==0.7.8` and Node
-22.23.2 with `deepagents@1.13.1`. Candidate execution remains in the same
+The workflow targets Python 3.11/3.12 with `deepagents==0.7.11` and Node
+22.23.2 with `deepagents@1.13.2`. Candidate execution remains in the same
 digest-pinned Python 3.12 Alpine verifier regardless of SDK language. The
 default validation path uses no paid model and no live system.
 
@@ -138,38 +138,38 @@ candidate contract, pinned Docker tests, trusted verifier receipts, clean
 reapply, draft delivery, independent `verify_run`, and ownership-checked
 cleanup. A component-level smoke cannot substitute for this composed proof.
 
-## Qualification snapshot: 2026-08-27
+## Qualification snapshot: 2026-08-31
 
-- `./scripts/run-local.sh test`: 146 controller and adversarial tests passed;
+- `./scripts/run-local.sh test`: 152 controller and adversarial tests passed;
   the two optional Python SDK-import tests skipped under the base interpreter as
   designed.
-- Offline qualification passed for both 62-package locks, PyPI artifacts and
-  licenses, exact tags, scoped source heads, and the recorded 56-page Deep
-  Agents documentation inventory. The current live comparison detects a newer
-  `deepagents-code==0.1.63` release plus documentation and source drift; that is
-  a blocked upgrade pending a separate review, not evidence for changing the
-  qualified Python runtime.
-- Direct SDK smoke: passed with exactly six tools, denied out-of-scope and traversal probes, and zero observed network attempts.
+- Offline and live qualification passed for both 62-package locks, PyPI
+  artifacts and licenses, exact tags, scoped source heads, and the recorded
+  57-page Deep Agents documentation inventory. Deep Agents Code 0.1.65 remains
+  review-only and is not part of the executable workflow.
+- Direct SDK smokes: passed with exactly six tools, rejected forged
+  `execute`, `delete`, `task`, and `write_todos` dispatches, denied out-of-scope
+  and traversal probes, and observed zero network attempts.
 - Controller-to-worker SDK smoke: `SUCCEEDED` in one attempt with `scripted-no-transport`, trusted verification, exact artifact linkage, and complete cleanup.
 - Network-none SDK smoke: passed with a strictly validated host-output record and
   no ownership-labeled container or image left behind.
-- TypeScript lock/source/documentation qualification, strict compilation, seven
+- TypeScript lock/source/documentation qualification, strict compilation, nine
   worker tests, direct SDK smoke, controller-to-worker smoke, and network-none
   Docker smoke passed with exactly six tools and no observed network attempt.
 - Deterministic retry workflow: `SUCCEEDED` on attempt two and `verify --latest` reported no issues.
 - Disposable PostgreSQL/Kafka/OpenSearch workflow: `SUCCEEDED` on attempt one, independently verified, and left no matching container, network, or volume.
-- Trivy 0.70.0: the exact Node base-image finding set matches its current
-  hash-bound baseline, and npm, Corepack, Yarn, source, and compiler tooling are
-  removed from the final TypeScript smoke image. Kafka, PostgreSQL, and Python
-  image findings have drifted from their existing baselines, so release
-  eligibility remains blocked until that evidence is reviewed explicitly.
-- Deep Agents Code compatibility review: exact 0.1.62 source and the current 16-page
+- Trivy 0.70.0: OpenSearch still matches its hash-bound finding set. Kafka,
+  PostgreSQL, Python Alpine, and the Node build-base findings have drifted, so
+  release eligibility remains blocked until each delta is reviewed explicitly.
+  npm, Corepack, Yarn, source, and compiler tooling are still removed from the
+  final TypeScript smoke image; that does not authorize refreshing the base
+  image exception without review.
+- Deep Agents Code compatibility review: exact 0.1.65 source and the current 17-page
   official Code documentation set were reviewed; the lane remains disabled
   because the stock CLI cannot satisfy the full ambient-state and network
   isolation contract.
-- The upstream record tracks `deepagents==0.7.9` as the latest release while
-  the executable runtime remains deliberately pinned to the fully tested
-  `deepagents==0.7.8` boundary.
+- The upstream record and executable runtime both bind to the fully tested
+  `deepagents==0.7.11` boundary.
 - Public-surface scan: zero issues.
 - Ruff 0.12.12 lint and format checks: passed.
 - `git diff --check`: passed.

@@ -128,7 +128,7 @@ manifest = {
     "schema_version": 1,
     "sdk_language": "typescript",
     "node_version": "22.23.2",
-    "runtime_version": "1.13.1",
+    "runtime_version": "1.13.2",
     "worker_source_sha256": os.environ["SOURCE_SHA256"],
     "package_lock_sha256": os.environ["LOCK_SHA256"],
     "worker_sha256": os.environ["WORKER_SHA256"],

@@ -37,6 +37,10 @@ class DeepAgentsSdkSmokeTests(unittest.TestCase):
             worker.EXCLUDED_PROFILE_TOOLS,
             frozenset({"delete", "execute", "write_todos"}),
         )
+        self.assertEqual(
+            worker.FORBIDDEN_TOOLS,
+            frozenset({"delete", "execute", "task", "write_todos"}),
+        )
 
     def test_smoke_fails_closed_after_any_network_attempt(self) -> None:
         tools = ["edit_file", "glob", "grep", "ls", "read_file", "write_file"]
@@ -49,6 +53,7 @@ class DeepAgentsSdkSmokeTests(unittest.TestCase):
                 tool_names=tools,
                 expected_tools=tools,
                 network_attempts=["socket.connect"],
+                forbidden_tool_calls_rejected=True,
             )
         )
 
@@ -68,9 +73,25 @@ class DeepAgentsSdkSmokeTests(unittest.TestCase):
                         tool_names=tools,
                         expected_tools=tools,
                         network_attempts=[],
+                        forbidden_tool_calls_rejected=True,
                         **boundaries,
                     )
                 )
+
+    def test_smoke_fails_closed_if_forbidden_dispatch_is_not_rejected(self) -> None:
+        tools = ["edit_file", "glob", "grep", "ls", "read_file", "write_file"]
+        self.assertFalse(
+            smoke._smoke_passed(
+                workspace_edit_succeeded=True,
+                out_of_scope_write_denied=True,
+                traversal_write_denied=True,
+                traversal_read_denied=True,
+                tool_names=tools,
+                expected_tools=tools,
+                network_attempts=[],
+                forbidden_tool_calls_rejected=False,
+            )
+        )
 
     def test_os_network_guard_accepts_expected_denials(self) -> None:
         probe = mock.Mock()

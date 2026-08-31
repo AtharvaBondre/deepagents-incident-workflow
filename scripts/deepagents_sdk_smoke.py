@@ -7,6 +7,7 @@ import argparse
 import importlib.util
 import json
 import os
+import shlex
 import socket
 import tempfile
 from datetime import datetime, timezone
@@ -29,7 +30,9 @@ def _load_worker() -> Any:
     return module
 
 
-def _scripted_model() -> Any:
+def _scripted_model(
+    *, forbidden_tool: str | None = None, command_target: Path | None = None
+) -> Any:
     """Create the fake model lazily so importing this script needs no SDK extras."""
     from collections.abc import Callable, Iterator, Sequence  # noqa: PLC0415
 
@@ -77,79 +80,154 @@ def _scripted_model() -> Any:
             del messages, stop, run_manager, kwargs
             return ChatResult(generations=[ChatGeneration(message=next(self.messages))])
 
-    scripted = ScriptedChatModel(
-        messages=iter(
-            [
-                AIMessage(
-                    content="",
-                    tool_calls=[
-                        {
-                            "name": "write_file",
-                            "args": {
-                                "file_path": "/tests/forbidden.txt",
-                                "content": "must-not-exist\n",
-                            },
-                            "id": "write-forbidden-smoke",
-                            "type": "tool_call",
-                        }
-                    ],
-                ),
-                AIMessage(
-                    content="",
-                    tool_calls=[
-                        {
-                            "name": "write_file",
-                            "args": {
-                                "file_path": "/../escape-write.txt",
-                                "content": "must-not-escape\n",
-                            },
-                            "id": "write-traversal-smoke",
-                            "type": "tool_call",
-                        }
-                    ],
-                ),
-                AIMessage(
-                    content="",
-                    tool_calls=[
-                        {
-                            "name": "read_file",
-                            "args": {"file_path": "/../outside-secret.txt"},
-                            "id": "read-traversal-smoke",
-                            "type": "tool_call",
-                        }
-                    ],
-                ),
-                AIMessage(
-                    content="",
-                    tool_calls=[
-                        {
-                            "name": "read_file",
-                            "args": {"file_path": "/app/value.txt"},
-                            "id": "read-smoke",
-                            "type": "tool_call",
-                        }
-                    ],
-                ),
-                AIMessage(
-                    content="",
-                    tool_calls=[
-                        {
-                            "name": "edit_file",
-                            "args": {
-                                "file_path": "/app/value.txt",
-                                "old_string": "before\n",
-                                "new_string": "after\n",
-                            },
-                            "id": "edit-smoke",
-                            "type": "tool_call",
-                        }
-                    ],
-                ),
-                AIMessage(content="Candidate edit prepared; controller verification required."),
-            ]
-        )
-    )
+    if forbidden_tool is not None:
+        forbidden_arguments: dict[str, dict[str, Any]] = {
+            "delete": {"file_path": "/app/delete-canary.txt"},
+            "execute": {
+                "command": f"touch {shlex.quote(str(command_target))}"
+                if command_target is not None
+                else "exit 0"
+            },
+            "task": {"description": "forbidden synthetic subagent dispatch"},
+            "write_todos": {"todos": []},
+        }
+        if forbidden_tool not in forbidden_arguments:
+            raise ValueError(f"unsupported forbidden tool probe: {forbidden_tool}")
+        messages = [
+            AIMessage(
+                content="",
+                tool_calls=[
+                    {
+                        "name": forbidden_tool,
+                        "args": forbidden_arguments[forbidden_tool],
+                        "id": f"forbidden-{forbidden_tool}-dispatch",
+                        "type": "tool_call",
+                    }
+                ],
+            ),
+            AIMessage(content="A forbidden dispatch unexpectedly returned."),
+        ]
+    else:
+        messages = [
+            AIMessage(
+                content="",
+                tool_calls=[
+                    {
+                        "name": "write_file",
+                        "args": {
+                            "file_path": "/tests/forbidden.txt",
+                            "content": "must-not-exist\n",
+                        },
+                        "id": "write-forbidden-smoke",
+                        "type": "tool_call",
+                    }
+                ],
+            ),
+            AIMessage(
+                content="",
+                tool_calls=[
+                    {
+                        "name": "write_file",
+                        "args": {
+                            "file_path": "/../escape-write.txt",
+                            "content": "must-not-escape\n",
+                        },
+                        "id": "write-traversal-smoke",
+                        "type": "tool_call",
+                    }
+                ],
+            ),
+            AIMessage(
+                content="",
+                tool_calls=[
+                    {
+                        "name": "read_file",
+                        "args": {"file_path": "/../outside-secret.txt"},
+                        "id": "read-traversal-smoke",
+                        "type": "tool_call",
+                    }
+                ],
+            ),
+            AIMessage(
+                content="",
+                tool_calls=[
+                    {
+                        "name": "read_file",
+                        "args": {"file_path": "/app/value.txt"},
+                        "id": "read-smoke",
+                        "type": "tool_call",
+                    }
+                ],
+            ),
+            AIMessage(
+                content="",
+                tool_calls=[
+                    {
+                        "name": "edit_file",
+                        "args": {
+                            "file_path": "/app/value.txt",
+                            "old_string": "before\n",
+                            "new_string": "after\n",
+                        },
+                        "id": "edit-smoke",
+                        "type": "tool_call",
+                    }
+                ],
+            ),
+            AIMessage(content="Candidate edit prepared; controller verification required."),
+        ]
+    scripted = ScriptedChatModel(messages=iter(messages))
     return scripted
+
+
+def _error_contains(error: BaseException, expected: str) -> bool:
+    pending: list[BaseException] = [error]
+    seen: set[int] = set()
+    while pending:
+        current = pending.pop()
+        if id(current) in seen:
+            continue
+        seen.add(id(current))
+        if expected in str(current):
+            return True
+        nested = getattr(current, "exceptions", ())
+        if isinstance(nested, (list, tuple)):
+            pending.extend(item for item in nested if isinstance(item, BaseException))
+        for item in (current.__cause__, current.__context__):
+            if isinstance(item, BaseException):
+                pending.append(item)
+    return False
+
+
+def _assert_forbidden_dispatch_rejected(
+    *, worker: Any, workspace: Path, packet: dict[str, Any]
+) -> bool:
+    delete_canary = workspace / "app" / "delete-canary.txt"
+    execute_canary = workspace / "app" / "execute-canary.txt"
+    delete_canary.write_text("must-remain\n", encoding="utf-8")
+    for tool_name in ("execute", "delete", "task", "write_todos"):
+        model = _scripted_model(forbidden_tool=tool_name, command_target=execute_canary)
+        agent = worker.build_bounded_agent(
+            model=model,
+            profile_key="openai",
+            workspace=workspace,
+            packet=packet,
+        )
+        try:
+            agent.invoke(
+                {"messages": [{"role": "user", "content": "Run the synthetic probe."}]},
+                config={"recursion_limit": 8},
+            )
+        except BaseException as exc:
+            if not _error_contains(exc, f"forbidden tool call: {tool_name}"):
+                raise AssertionError(
+                    f"{tool_name} was not rejected by the controller dispatch boundary"
+                ) from exc
+        else:
+            raise AssertionError(f"forbidden tool call unexpectedly completed: {tool_name}")
+    if execute_canary.exists() or delete_canary.read_text(encoding="utf-8") != "must-remain\n":
+        raise AssertionError("a forbidden tool dispatch changed the workspace")
+    return True
 
 
 def _smoke_passed(
@@ -161,6 +239,7 @@ def _smoke_passed(
     tool_names: list[str],
     expected_tools: list[str],
     network_attempts: list[str],
+    forbidden_tool_calls_rejected: bool,
 ) -> bool:
     return (
         workspace_edit_succeeded
@@ -169,6 +248,7 @@ def _smoke_passed(
         and traversal_read_denied
         and tool_names == expected_tools
         and {"delete", "execute", "task", "write_todos"}.isdisjoint(tool_names)
+        and forbidden_tool_calls_rejected
         and not network_attempts
     )
 
@@ -244,6 +324,11 @@ def run_smoke(
         target.parent.mkdir(parents=True)
         target.write_text("before\n", encoding="utf-8")
         outside_secret.write_text(outside_canary + "\n", encoding="utf-8")
+        forbidden_tool_calls_rejected = _assert_forbidden_dispatch_rejected(
+            worker=worker,
+            workspace=workspace,
+            packet=packet,
+        )
         agent = worker.build_bounded_agent(
             model=scripted,
             profile_key="openai",
@@ -280,6 +365,7 @@ def run_smoke(
             tool_names=tool_names,
             expected_tools=expected_tools,
             network_attempts=network_attempts,
+            forbidden_tool_calls_rejected=forbidden_tool_calls_rejected,
         )
         record = {
             "schema_version": 1,
@@ -294,6 +380,7 @@ def run_smoke(
             "forbidden_tools_absent": all(
                 item not in tool_names for item in ("delete", "execute", "task", "write_todos")
             ),
+            "forbidden_tool_calls_rejected": forbidden_tool_calls_rejected,
             "workspace_edit_succeeded": workspace_edit_succeeded,
             "out_of_scope_write_denied": out_of_scope_write_denied,
             "traversal_write_denied": traversal_write_denied,

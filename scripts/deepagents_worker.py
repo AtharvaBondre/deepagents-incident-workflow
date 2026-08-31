@@ -18,19 +18,21 @@ from pathlib import Path
 from typing import Any
 from unittest import mock
 
-EXPECTED_DEEPAGENTS_VERSION = "0.7.8"
+EXPECTED_DEEPAGENTS_VERSION = "0.7.11"
 MAX_REQUEST_BYTES = 128 * 1024
 MAX_FINAL_RESPONSE_BYTES = 32 * 1024
 MAX_TURNS = 20
 ALLOWED_TOOLS = ["ls", "read_file", "write_file", "edit_file", "glob", "grep"]
+ALLOWED_TOOL_SET = frozenset(ALLOWED_TOOLS)
+FORBIDDEN_TOOLS = frozenset({"delete", "execute", "task", "write_todos"})
 EXCLUDED_PROFILE_TOOLS = frozenset({"delete", "execute", "write_todos"})
 PROFILE_ENTRY_POINT_GROUPS = (
     "deepagents.provider_profiles",
     "deepagents.harness_profiles",
 )
 EXPECTED_PROVIDER_PACKAGES = {
-    "anthropic": ("langchain-anthropic", "1.6.1"),
-    "google_genai": ("langchain-google-genai", "4.3.5"),
+    "anthropic": ("langchain-anthropic", "1.7.0"),
+    "google_genai": ("langchain-google-genai", "4.3.7"),
     "ollama": ("langchain-ollama", "1.1.0"),
     "openai": ("langchain-openai", "1.6.0"),
 }
@@ -174,6 +176,63 @@ def reject_third_party_profile_plugins() -> None:
         )
 
 
+def controller_tool_boundary_middleware() -> Any:
+    """Reject every tool surface or dispatch not owned by the controller."""
+    from langchain.agents.middleware.types import AgentMiddleware  # noqa: PLC0415
+
+    class ControllerToolBoundaryMiddleware(AgentMiddleware[Any, Any, Any]):
+        name = "ControllerToolBoundaryMiddleware"
+
+        @staticmethod
+        def _request_tool_names(request: Any) -> list[str]:
+            names: list[str] = []
+            for tool in request.tools:
+                if isinstance(tool, dict):
+                    name = tool.get("name")
+                    if not isinstance(name, str):
+                        function = tool.get("function")
+                        name = function.get("name") if isinstance(function, dict) else None
+                else:
+                    name = getattr(tool, "name", None)
+                if not isinstance(name, str):
+                    raise RuntimeError("Deep Agents supplied an unnamed tool")
+                names.append(name)
+            return sorted(names)
+
+        def _check_model_tools(self, request: Any) -> None:
+            observed = self._request_tool_names(request)
+            expected = sorted(ALLOWED_TOOLS)
+            if observed != expected:
+                raise RuntimeError(
+                    "Deep Agents tool surface is incomplete or expanded: " + ", ".join(observed)
+                )
+
+        @staticmethod
+        def _check_tool_call(request: Any) -> None:
+            tool_call = getattr(request, "tool_call", None)
+            name = tool_call.get("name") if isinstance(tool_call, dict) else None
+            if name not in ALLOWED_TOOL_SET:
+                raise RuntimeError(f"forbidden tool call: {name or '<missing>'}")
+
+        def wrap_model_call(self, request: Any, handler: Callable[[Any], Any]) -> Any:
+            self._check_model_tools(request)
+            return handler(request)
+
+        async def awrap_model_call(self, request: Any, handler: Callable[[Any], Any]) -> Any:
+            self._check_model_tools(request)
+            return await handler(request)
+
+        def wrap_tool_call(self, request: Any, handler: Callable[[Any], Any]) -> Any:
+            self._check_tool_call(request)
+            return handler(request)
+
+        async def awrap_tool_call(self, request: Any, handler: Callable[[Any], Any]) -> Any:
+            self._check_tool_call(request)
+            return await handler(request)
+
+    return ControllerToolBoundaryMiddleware()
+
+
 def build_bounded_agent(
     *,
     model: Any,
@@ -195,7 +254,7 @@ def build_bounded_agent(
 
     backend = FilesystemBackend(root_dir=workspace, virtual_mode=True)
     # The explicit preflight above rejects installed plugins, and this exact-version
-    # guard closes the enumeration-to-bootstrap race inside Deep Agents 0.7.8.
+    # guard closes the enumeration-to-bootstrap race inside Deep Agents 0.7.11.
     _builtin_profiles.entry_points = lambda **_kwargs: ()
     permissions = _permissions(packet)
     register_harness_profile(
@@ -214,7 +273,8 @@ def build_bounded_agent(
                 backend=backend,
                 tools=ALLOWED_TOOLS,
                 _permissions=permissions,
-            )
+            ),
+            controller_tool_boundary_middleware(),
         ],
         subagents=[],
         skills=None,

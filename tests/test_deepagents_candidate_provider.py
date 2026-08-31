@@ -651,7 +651,7 @@ class DeepAgentsCandidateProviderTests(unittest.TestCase):
             self.assertNotIn("-I", command)
             execution = runner.read_json(artifact_dir / "attempt-1-deepagents-execution.json")
             self.assertEqual(execution["sdk_language"], "typescript")
-            self.assertEqual(execution["runtime_version"], "1.13.1")
+            self.assertEqual(execution["runtime_version"], "1.13.2")
             self.assertEqual(execution["node_version"], "22.23.2")
             self.assertTrue(execution["cleanup"]["complete"])
 

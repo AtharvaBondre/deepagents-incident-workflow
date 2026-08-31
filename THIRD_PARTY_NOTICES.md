@@ -6,10 +6,10 @@ The optional SDK integration and local examples use separately distributed compo
 
 | Component | Use | License |
 |---|---|---|
-| [Deep Agents Python](https://github.com/langchain-ai/deepagents) 0.7.8 | External Python candidate-authoring SDK | MIT, LangChain contributors |
-| [Deep Agents JavaScript](https://github.com/langchain-ai/deepagentsjs) 1.13.1 | External TypeScript candidate-authoring SDK | MIT, LangChain contributors |
-| [LangChain Python Anthropic](https://github.com/langchain-ai/langchain) 1.6.1 | Optional Python Anthropic model integration | MIT, LangChain contributors |
-| [LangChain Python Google GenAI](https://github.com/langchain-ai/langchain-google) 4.3.5 | Optional Python Google model integration | MIT, LangChain contributors |
+| [Deep Agents Python](https://github.com/langchain-ai/deepagents) 0.7.11 | External Python candidate-authoring SDK | MIT, LangChain contributors |
+| [Deep Agents JavaScript](https://github.com/langchain-ai/deepagentsjs) 1.13.2 | External TypeScript candidate-authoring SDK | MIT, LangChain contributors |
+| [LangChain Python Anthropic](https://github.com/langchain-ai/langchain) 1.7.0 | Optional Python Anthropic model integration | MIT, LangChain contributors |
+| [LangChain Python Google GenAI](https://github.com/langchain-ai/langchain-google) 4.3.7 | Optional Python Google model integration | MIT, LangChain contributors |
 | [LangChain Python Ollama](https://github.com/langchain-ai/langchain) 1.1.0 | Optional Python Ollama model integration | MIT, LangChain contributors |
 | [LangChain Python OpenAI](https://github.com/langchain-ai/langchain) 1.6.0 | Optional Python OpenAI model integration | MIT, LangChain contributors |
 | [LangChain JavaScript Anthropic](https://github.com/langchain-ai/langchainjs) 1.5.8 | Optional TypeScript Anthropic model integration | MIT, LangChain contributors |
@@ -17,8 +17,8 @@ The optional SDK integration and local examples use separately distributed compo
 | [LangChain JavaScript Ollama](https://github.com/langchain-ai/langchainjs) 1.3.0 | Optional TypeScript Ollama model integration | MIT, LangChain contributors |
 | [LangChain JavaScript OpenAI](https://github.com/langchain-ai/langchainjs) 1.5.10 | Optional TypeScript OpenAI model integration | MIT, LangChain contributors |
 | [LangGraph](https://github.com/langchain-ai/langgraph) 1.2.11 | Qualified transitive graph runtime | MIT, LangChain contributors |
-| [LangChain](https://github.com/langchain-ai/langchain) 1.3.17 | Qualified transitive agent runtime | MIT, LangChain contributors |
-| [LangSmith SDK](https://github.com/langchain-ai/langsmith-sdk) 0.11.1 | Qualified transitive SDK; tracing disabled by default | MIT, LangChain contributors |
+| [LangChain](https://github.com/langchain-ai/langchain) 1.3.18 | Qualified transitive agent runtime | MIT, LangChain contributors |
+| [LangSmith SDK](https://github.com/langchain-ai/langsmith-sdk) 0.11.2 | Qualified transitive SDK; tracing disabled by default | MIT, LangChain contributors |
 | [LangChain JavaScript](https://github.com/langchain-ai/langchainjs) 1.5.10 | TypeScript agent runtime; external npm package | MIT, LangChain contributors |
 | [LangGraph JavaScript](https://github.com/langchain-ai/langgraphjs) 1.4.13 | TypeScript graph runtime; external npm package | MIT, LangChain contributors |
 | [LangSmith JavaScript SDK](https://github.com/langchain-ai/langsmith-sdk) 0.9.0 | TypeScript transitive SDK; tracing disabled | MIT, LangChain contributors |

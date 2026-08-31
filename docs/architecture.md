@@ -35,8 +35,8 @@ The fixture provider applies reviewed patches through the same candidate contrac
 3. initializes a shadow Git repository outside the candidate-visible tree;
 4. gives a fresh worker an ephemeral home;
 5. sends a size-bounded, strict-field request described by `schemas/deepagents-request.schema.json`;
-6. starts the selected exact SDK (`deepagents==0.7.8` for Python or
-   `deepagents@1.13.1` for TypeScript) with no checkpointer, store, memory,
+6. starts the selected exact SDK (`deepagents==0.7.11` for Python or
+   `deepagents@1.13.2` for TypeScript) with no checkpointer, store, memory,
    skills, or subagents;
 7. exposes only `ls`, `read_file`, `write_file`, `edit_file`, `glob`, and `grep`
    through an explicitly virtual-root `FilesystemBackend`;

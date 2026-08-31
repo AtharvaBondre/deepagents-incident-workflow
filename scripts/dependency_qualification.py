@@ -37,7 +37,7 @@ PYTHON_DOC_INDEX = "https://docs.langchain.com/oss/python/deepagents/llms.txt"
 ROOT_DOC_INDEX = "https://docs.langchain.com/llms.txt"
 PYTHON_DOC_PREFIX = "https://docs.langchain.com/oss/python/deepagents/"
 CODE_DOC_PREFIX = "https://docs.langchain.com/oss/deepagents/code/"
-EXPECTED_DOC_COUNTS = {"python": 40, "code": 16}
+EXPECTED_DOC_COUNTS = {"python": 40, "code": 17}
 MAX_HTTP_BYTES = 2_000_000
 HTTP_TIMEOUT_SECONDS = 30
 USER_AGENT = "deepagents-incident-workflow-dependency-qualification/1"
@@ -258,6 +258,16 @@ def _validated_upstream_url(url: str) -> urllib.parse.ParseResult:
     return parsed
 
 
+def _request_headers(url: str) -> dict[str, str]:
+    """Use the workflow token only for the allowlisted GitHub API host."""
+    parsed = _validated_upstream_url(url)
+    headers = {"Accept": "application/json, text/plain;q=0.9", "User-Agent": USER_AGENT}
+    github_token = os.environ.get("GITHUB_TOKEN", "").strip()
+    if parsed.hostname == "api.github.com" and github_token:
+        headers["Authorization"] = f"Bearer {github_token}"
+    return headers
+
+
 class ValidatingRedirectHandler(urllib.request.HTTPRedirectHandler):
     """Reject a redirect target before urllib makes the next request."""
 
@@ -271,7 +281,7 @@ class ValidatingRedirectHandler(urllib.request.HTTPRedirectHandler):
         new_url: str,
     ) -> urllib.request.Request | None:
         _validated_upstream_url(new_url)
-        return super().redirect_request(
+        redirected = super().redirect_request(
             request,
             response,
             code,
@@ -279,14 +289,14 @@ class ValidatingRedirectHandler(urllib.request.HTTPRedirectHandler):
             headers,
             new_url,
         )
+        if redirected is not None and urllib.parse.urlparse(new_url).hostname != "api.github.com":
+            redirected.remove_header("Authorization")
+        return redirected
 
 
 def _request_bytes(url: str) -> bytes:
     _validated_upstream_url(url)
-    request = urllib.request.Request(
-        url,
-        headers={"Accept": "application/json, text/plain;q=0.9", "User-Agent": USER_AGENT},
-    )
+    request = urllib.request.Request(url, headers=_request_headers(url))
     opener = urllib.request.build_opener(
         urllib.request.ProxyHandler({}),
         ValidatingRedirectHandler(),

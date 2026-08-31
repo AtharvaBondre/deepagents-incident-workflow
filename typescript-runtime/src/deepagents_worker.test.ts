@@ -17,6 +17,7 @@ import {
   installNetworkDeny,
   loadRequest,
   permissionSpecs,
+  requireExactToolNames,
 } from "./deepagents_worker.js";
 
 function requestPacket(): Record<string, unknown> {
@@ -36,6 +37,19 @@ function requestPacket(): Record<string, unknown> {
   };
 }
 
+function errorContains(value: unknown, expected: string, seen = new Set<unknown>()): boolean {
+  if (value === null || value === undefined || seen.has(value)) return false;
+  seen.add(value);
+  if (value instanceof Error && value.message.includes(expected)) return true;
+  if (typeof value !== "object") return false;
+  const candidate = value as { cause?: unknown; errors?: unknown };
+  if (errorContains(candidate.cause, expected, seen)) return true;
+  return (
+    Array.isArray(candidate.errors) &&
+    candidate.errors.some((item) => errorContains(item, expected, seen))
+  );
+}
+
 test("exports exactly the controller-approved filesystem tool names", () => {
   assert.deepEqual([...ALLOWED_TOOLS], [
     "ls",
@@ -48,6 +62,66 @@ test("exports exactly the controller-approved filesystem tool names", () => {
   assert.equal(FORBIDDEN_TOOLS.includes("delete"), true);
   assert.equal(FORBIDDEN_TOOLS.includes("execute"), true);
   assert.equal(FORBIDDEN_TOOLS.includes("task"), true);
+  assert.equal(FORBIDDEN_TOOLS.includes("write_todos"), true);
+});
+
+test("rejects unnamed provider-side tools before a model request can be forwarded", () => {
+  const tools: unknown[] = [
+    ...ALLOWED_TOOLS.map((name) => ({ name })),
+    { type: "web_search" },
+  ];
+  let forwarded = false;
+  assert.throws(() => {
+    requireExactToolNames(tools);
+    forwarded = true;
+  }, /unnamed or malformed tool/);
+  assert.equal(forwarded, false);
+});
+
+test("rejects forbidden tool calls at the controller dispatch boundary", async () => {
+  const temporary = await fsPromises.mkdtemp(path.join(os.tmpdir(), "daiw-ts-dispatch-test-"));
+  const deleteCanary = path.join(temporary, "app", "delete-canary.txt");
+  const executeCanary = path.join(temporary, "app", "execute-canary.txt");
+  try {
+    await fsPromises.mkdir(path.dirname(deleteCanary), { recursive: true });
+    await fsPromises.writeFile(deleteCanary, "must-remain\n", "utf8");
+    const args: Record<string, Record<string, unknown>> = {
+      delete: { file_path: "/app/delete-canary.txt" },
+      execute: { command: `touch ${JSON.stringify(executeCanary)}` },
+      task: { description: "forbidden synthetic subagent dispatch" },
+      write_todos: { todos: [] },
+    };
+    for (const toolName of ["execute", "delete", "task", "write_todos"] as const) {
+      const model = fakeModel();
+      model.respondWithTools([
+        { name: toolName, id: `forbidden-${toolName}-dispatch`, args: args[toolName]! },
+      ]);
+      model.respond(new AIMessage("A forbidden dispatch unexpectedly returned."));
+      Object.defineProperty(model, "getName", {
+        configurable: false,
+        value: () => "ChatOpenAI",
+        writable: false,
+      });
+      const bounded = await buildBoundedAgent({
+        model,
+        profileKey: "openai",
+        workspace: temporary,
+        packet: requestPacket(),
+      });
+      await assert.rejects(
+        async () =>
+          bounded.agent.invoke(
+            { messages: [{ role: "user", content: "Run the synthetic probe." }] },
+            { recursionLimit: 8 },
+          ),
+        (error: unknown) => errorContains(error, `forbidden tool call: ${toolName}`),
+      );
+    }
+    await assert.rejects(fsPromises.lstat(executeCanary), /ENOENT/);
+    assert.equal(await fsPromises.readFile(deleteCanary, "utf8"), "must-remain\n");
+  } finally {
+    await fsPromises.rm(temporary, { recursive: true, force: true });
+  }
 });
 
 test("uses first-match allow rules followed by deny-all rules", () => {

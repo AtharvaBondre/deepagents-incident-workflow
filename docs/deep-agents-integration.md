@@ -8,8 +8,8 @@ packages and are not vendored.
 ## Why the SDK is the integration point
 
 The SDKs let the controller construct the exact agent used for an attempt. The
-Python worker uses `deepagents==0.7.8`; the TypeScript worker uses
-`deepagents@1.13.1`. Both create:
+Python worker uses `deepagents==0.7.11`; the TypeScript worker uses
+`deepagents@1.13.2`. Both create:
 
 - a disposable `FilesystemBackend` in virtual-root mode;
 - only `ls`, `read_file`, `write_file`, `edit_file`, `glob`, and `grep`;
@@ -23,14 +23,17 @@ sandbox. Candidate code never runs in that process. Tests and trusted
 verification run later in separate digest-pinned Docker containers with
 networking disabled.
 
+Both workers add controller-owned middleware that observes the unmodified tool
+set offered to every model call, fails closed unless it is exactly the six-tool
+contract, and rejects every dispatch outside that contract. The direct smokes
+inject forged `execute`, `delete`, `task`, and `write_todos` calls and require
+the middleware to reject each one without changing workspace canaries.
+
 The TypeScript SDK differs in important details. Its filesystem backend must
 set `virtualMode: true` explicitly. Permissions are first-match-wins and
 default-allow, so the worker installs narrow allow rules followed by explicit
 deny-all rules. A registered harness profile disables the general-purpose
-subagent and excludes delete, execute, todo, and task tools. A controller-owned
-middleware observes the unmodified tool set offered to every model call and
-fails closed unless it is exactly the six-tool contract. It also rejects every
-tool call outside that contract.
+subagent and excludes delete, execute, todo, and task tools.
 
 ## Upstream architecture used
 
@@ -54,10 +57,10 @@ arguments, tool output, and model responses.
 
 The qualified Python runtime uses:
 
-- `deepagents==0.7.8`;
+- `deepagents==0.7.11`;
 - `langgraph==1.2.11`;
-- `langchain==1.3.17`;
-- `langsmith==0.11.1`; and
+- `langchain==1.3.18`;
+- `langsmith==0.11.2`; and
 - exact provider-adapter versions recorded in the dependency qualification
   evidence.
 
@@ -67,7 +70,7 @@ for reproduction, upgrade, and rollback instructions.
 
 The qualified TypeScript runtime uses Node 22.23.2 and npm 10.9.8 with:
 
-- `deepagents@1.13.1`;
+- `deepagents@1.13.2`;
 - `langchain@1.5.10`;
 - `@langchain/core@1.2.9`;
 - `@langchain/langgraph@1.4.13`;

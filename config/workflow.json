@@ -36,15 +36,15 @@
     "default_sdk_language": "python",
     "runtimes": {
       "python": {
-        "sdk_version": "0.7.8",
+        "sdk_version": "0.7.11",
         "worker": "scripts/deepagents_worker.py"
       },
       "typescript": {
-        "sdk_version": "1.13.1",
+        "sdk_version": "1.13.2",
         "node_version": "22.23.2",
         "worker_source": "typescript-runtime/src/deepagents_worker.ts",
         "package_lock": "typescript-runtime/package-lock.json",
-        "worker_build_sha256": "d17288a3d92d4c42addb6233aa66e61f97840613b753c49998471e69274f019e"
+        "worker_build_sha256": "a4503ba699ee7cc9f6b429564baa818d4682922591a73d2394467bceb71fd4e8"
       }
     },
     "allowed_filesystem_tools": [

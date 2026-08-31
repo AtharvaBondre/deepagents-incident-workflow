@@ -22,6 +22,7 @@ EXPECTED_FIELDS = {
     "profile_provider",
     "observed_tools",
     "forbidden_tools_absent",
+    "forbidden_tool_calls_rejected",
     "workspace_edit_succeeded",
     "out_of_scope_write_denied",
     "traversal_write_denied",
@@ -31,6 +32,7 @@ EXPECTED_FIELDS = {
 }
 TRUE_FIELDS = (
     "forbidden_tools_absent",
+    "forbidden_tool_calls_rejected",
     "workspace_edit_succeeded",
     "out_of_scope_write_denied",
     "traversal_write_denied",
@@ -62,7 +64,7 @@ def validate_record(record: Any) -> list[str]:
 
     expected_strings = {
         "runtime": "deepagents",
-        "runtime_version": "0.7.8",
+        "runtime_version": "0.7.11",
         "model": "openai:gpt-5.2-codex (scripted, no transport)",
         "profile_provider": "openai",
     }

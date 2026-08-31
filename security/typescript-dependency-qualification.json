@@ -1,14 +1,14 @@
 {
   "schema_version": 1,
-  "captured_at": "2026-08-27T04:49:57Z",
+  "captured_at": "2026-08-31T04:27:32Z",
   "runtime": {
     "node_version": "22.23.2",
     "npm_version": "10.9.8",
-    "deepagents_version": "1.13.1"
+    "deepagents_version": "1.13.2"
   },
   "lock": {
     "path": "typescript-runtime/package-lock.json",
-    "sha256": "e73d8edfb986bfa5b3ef6a97a45ebc642f61aab47940a62275128f6728445017",
+    "sha256": "3c3f3be2a3af64dba29dbb6b562df589b1b453eadf4d1444525d89ce01f9b7e7",
     "lockfile_version": 3,
     "package_count": 82,
     "registry": "https://registry.npmjs.org/",
@@ -22,11 +22,11 @@
   },
   "source": {
     "repository": "https://github.com/langchain-ai/deepagentsjs",
-    "tag": "refs/tags/deepagents@1.13.1",
-    "tag_object": "f04ab62269356eaa5d400154dbf819371467cd4d",
-    "commit": "c0bc7692304f591526eadf9172c60a594f2a933f",
-    "tarball": "https://registry.npmjs.org/deepagents/-/deepagents-1.13.1.tgz",
-    "integrity": "sha512-DB8dkbrd4cqejroU90qAGTtY7ZvIchsMSaOMjE7TWnsi/6IrpBPxg3xN0Vxjuq/x8jkufkIqk3I57RbZmdSJFw=="
+    "tag": "refs/tags/deepagents@1.13.2",
+    "tag_object": "23a1c36587d0b462dd4a93ec8727c523f024a87d",
+    "commit": "b13a9966d04174e718108452cccf7e6b3231653b",
+    "tarball": "https://registry.npmjs.org/deepagents/-/deepagents-1.13.2.tgz",
+    "integrity": "sha512-OMm+Ark4yaICZhGqC9kYkIx5vw5eH+GqIhzX1PAMmYhdxK5XeBTyn4pdfo1fKrBj2X/8GEg6TPnKS2jORLqJAQ=="
   },
   "documentation": [
     {
@@ -36,8 +36,8 @@
     },
     {
       "url": "https://docs.langchain.com/oss/javascript/deepagents/overview.md",
-      "bytes": 24849,
-      "sha256": "c0cf7966769cecafee1091a1b11ed2c1f0d008a13824c1aaa867fd90471c9274"
+      "bytes": 73595,
+      "sha256": "6341d7848adfcb3239cb711b3e99db90192db6dc87b5f22e438f4dd81310090c"
     }
   ],
   "audit": {

@@ -13,7 +13,7 @@ import { pathToFileURL } from "node:url";
 
 import type { CreateDeepAgentParams, FilesystemPermission } from "deepagents";
 
-export const EXPECTED_DEEPAGENTS_VERSION = "1.13.1";
+export const EXPECTED_DEEPAGENTS_VERSION = "1.13.2";
 export const EXPECTED_NODE_VERSION = "22.23.2";
 export const MAX_REQUEST_BYTES = 128 * 1024;
 export const MAX_FINAL_RESPONSE_BYTES = 32 * 1024;
@@ -185,11 +185,21 @@ export function permissionSpecs(packet: JsonObject): FilesystemPermission[] {
   ];
 }
 
-function exactToolNames(tools: readonly { name?: string }[]): string[] {
-  return tools
-    .map((tool) => tool.name)
-    .filter((name): name is string => typeof name === "string")
-    .sort();
+export function requireExactToolNames(tools: readonly unknown[]): string[] {
+  const observed = tools.map((tool) => {
+    if (!isObject(tool) || typeof tool.name !== "string" || tool.name.length === 0) {
+      throw new Error("Deep Agents TypeScript supplied an unnamed or malformed tool");
+    }
+    return tool.name;
+  });
+  const expected = [...ALLOWED_TOOLS].sort();
+  observed.sort();
+  if (JSON.stringify(observed) !== JSON.stringify(expected)) {
+    throw new Error(
+      `Deep Agents TypeScript tool surface is incomplete or expanded: ${observed.join(", ")}`,
+    );
+  }
+  return observed;
 }
 
 export async function buildScriptedSmokeModel(packet: JsonObject) {
@@ -286,13 +296,7 @@ export async function buildBoundedAgent(options: {
   const toolBoundary = createMiddleware({
     name: "ControllerToolBoundaryMiddleware",
     wrapModelCall(request, handler) {
-      observedTools = exactToolNames(request.tools);
-      const expected = [...ALLOWED_TOOLS].sort();
-      if (JSON.stringify(observedTools) !== JSON.stringify(expected)) {
-        throw new Error(
-          `Deep Agents TypeScript tool surface is incomplete or expanded: ${observedTools.join(", ")}`,
-        );
-      }
+      observedTools = requireExactToolNames(request.tools);
       return handler(request);
     },
     wrapToolCall(request, handler) {

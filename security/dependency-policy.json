@@ -4,7 +4,7 @@
     "hashes_required": true,
     "index": "https://pypi.org/simple",
     "name": "uv",
-    "resolution_cutoff": "2026-08-26T04:24:28Z",
+    "resolution_cutoff": "2026-08-31T04:31:42Z",
     "universal": true,
     "version": "0.12.5"
   }

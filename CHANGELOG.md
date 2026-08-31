@@ -3,25 +3,32 @@
 ## Unreleased
 
 - Added first-class TypeScript SDK support on Node 22.23.2 with
-  `deepagents@1.13.1`, the same six-tool boundary and controller-owned
+  `deepagents@1.13.2`, the same six-tool boundary and controller-owned
   verification path as Python, an integrity-locked npm graph, a digest-bound
   compiled worker, direct and end-to-end no-transport smokes, and an
   unprivileged network-none Docker smoke.
+- Added controller-owned dispatch rejection for forged `execute`, `delete`,
+  `task`, and `write_todos` calls in both SDK workers, with direct adversarial
+  smoke coverage that also proves the workspace remains unchanged. The
+  TypeScript boundary also rejects unnamed or malformed provider-side tools.
 - Added exact provider-model construction for tagged Ollama identifiers,
   removed subagent middleware instead of merely hiding its tool, pruned
   TypeScript build dependencies from runtime images, installed no-transport
   interception before SDK imports with fetch, socket, and DNS coverage, and
   added a scheduled live production npm advisory check.
 - Documented why the direct SDK is the supported integration and kept the
-  optional `deepagents-code==0.1.62` lane disabled because the current CLI
+  optional `deepagents-code==0.1.65` lane disabled because the current CLI
   cannot satisfy the complete ambient-state and network-isolation contract.
 - Added public model-provider setup and offline credential-presence preflight
   guidance without storing or printing secret values.
 - Removed dated research, continuation, and internal planning documents from
   the public tree and added a public-surface regression guard for them.
-- Refreshed the hash-locked dependency evidence to the 2026-08-26 cutoff while
-  retaining the qualified `deepagents==0.7.8` direct pin; recorded current
-  upstream `deepagents==0.7.9` and `deepagents-code==0.1.62` releases.
+- Refreshed the hash-locked dependency evidence to the 2026-08-31 cutoff and
+  upgraded the qualified SDKs to `deepagents==0.7.11` and
+  `deepagents@1.13.2` after direct, end-to-end, and network-none validation.
+- Scoped optional GitHub authentication for upstream qualification to direct,
+  proxy-free `api.github.com` requests and stripped it before every cross-host
+  redirect.
 
 ## 0.1.0 - 2026-08-25
 

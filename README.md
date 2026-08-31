@@ -25,8 +25,8 @@ The central rule is: **Deep Agents proposes; the controller decides.** Model tex
 ## Included
 
 - Success, retry-success, exhaustion, timeout, prompt-injection, early-exit, forged-success, crash, and verifier-timeout regressions.
-- First-class Python (`deepagents==0.7.8`) and TypeScript
-  (`deepagents@1.13.1`) SDK adapters that start a fresh process for every
+- First-class Python (`deepagents==0.7.11`) and TypeScript
+  (`deepagents@1.13.2`) SDK adapters that start a fresh process for every
   attempt and feed the same controller-owned verification path.
 - A virtual-root `FilesystemBackend` with explicit allow/deny permissions and only `ls`, `read_file`, `write_file`, `edit_file`, `glob`, and `grep`.
 - No agent shell, deletion, network tool, MCP, subagent, skill discovery, long-term memory, checkpointer, store, hook, plugin, or LangSmith tracing in the default integration.
@@ -210,7 +210,7 @@ Review a provider's retention and processing terms before using non-synthetic in
 Deep Agents Code (`deepagents-code`, command `dcode`) is a useful interactive coding product, but its headless client/server runtime has a broader trusted surface: project/user instruction discovery, persistent SQLite sessions and memory, hooks, plugins, MCP, `fetch_url`, optional shell access, update paths, and an unauthenticated localhost development server. The documented shell allowlist is not a containment boundary.
 
 The project therefore integrates the public SDK directly. [Deep Agents Code
-compatibility](docs/deep-agents-code.md) explains the current `dcode==0.1.62`
+compatibility](docs/deep-agents-code.md) explains the current `dcode==0.1.65`
 limitations and the conditions required before an optional CLI lane could be
 added. It would not replace the SDK-native core.
 

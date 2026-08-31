@@ -39,20 +39,20 @@ EXPECTED_DEPENDENCIES = {
     "@langchain/langgraph-sdk": "1.10.0",
     "@langchain/ollama": "1.3.0",
     "@langchain/openai": "1.5.10",
-    "deepagents": "1.13.1",
+    "deepagents": "1.13.2",
     "langchain": "1.5.10",
     "langsmith": "0.9.0",
 }
 EXPECTED_DEV_DEPENDENCIES = {"@types/node": "22.20.1", "typescript": "7.0.2"}
 EXPECTED_SOURCE = {
     "repository": "https://github.com/langchain-ai/deepagentsjs",
-    "tag": "refs/tags/deepagents@1.13.1",
-    "tag_object": "f04ab62269356eaa5d400154dbf819371467cd4d",
-    "commit": "c0bc7692304f591526eadf9172c60a594f2a933f",
-    "tarball": "https://registry.npmjs.org/deepagents/-/deepagents-1.13.1.tgz",
+    "tag": "refs/tags/deepagents@1.13.2",
+    "tag_object": "23a1c36587d0b462dd4a93ec8727c523f024a87d",
+    "commit": "b13a9966d04174e718108452cccf7e6b3231653b",
+    "tarball": "https://registry.npmjs.org/deepagents/-/deepagents-1.13.2.tgz",
     "integrity": (
-        "sha512-DB8dkbrd4cqejroU90qAGTtY7ZvIchsMSaOMjE7TWnsi/6IrpBPxg3xN0Vxjuq/"
-        "x8jkufkIqk3I57RbZmdSJFw=="
+        "sha512-OMm+Ark4yaICZhGqC9kYkIx5vw5eH+GqIhzX1PAMmYhdxK5XeBTyn4pdfo1fK"
+        "rBj2X/8GEg6TPnKS2jORLqJAQ=="
     ),
 }
 
@@ -78,6 +78,19 @@ def validated_upstream_url(url: str) -> urllib.parse.ParseResult:
     return parsed
 
 
+def upstream_headers(url: str) -> dict[str, str]:
+    """Use the workflow token only for the allowlisted GitHub API host."""
+    parsed = validated_upstream_url(url)
+    headers = {
+        "Accept": "application/json, text/markdown",
+        "User-Agent": "daiw-qualification/1",
+    }
+    github_token = os.environ.get("GITHUB_TOKEN", "").strip()
+    if parsed.hostname == "api.github.com" and github_token:
+        headers["Authorization"] = f"Bearer {github_token}"
+    return headers
+
+
 class ValidatingRedirectHandler(urllib.request.HTTPRedirectHandler):
     def redirect_request(
         self,
@@ -89,16 +102,19 @@ class ValidatingRedirectHandler(urllib.request.HTTPRedirectHandler):
         newurl: str,
     ) -> urllib.request.Request | None:
         validated_upstream_url(newurl)
-        return super().redirect_request(req, fp, code, msg, headers, newurl)
+        redirected = super().redirect_request(req, fp, code, msg, headers, newurl)
+        if redirected is not None and urllib.parse.urlparse(newurl).hostname != "api.github.com":
+            redirected.remove_header("Authorization")
+        return redirected
 
 
 def upstream_bytes(url: str) -> bytes:
     validated_upstream_url(url)
-    request = urllib.request.Request(
-        url,
-        headers={"Accept": "application/json, text/markdown", "User-Agent": "daiw-qualification/1"},
+    request = urllib.request.Request(url, headers=upstream_headers(url))
+    opener = urllib.request.build_opener(
+        urllib.request.ProxyHandler({}),
+        ValidatingRedirectHandler(),
     )
-    opener = urllib.request.build_opener(ValidatingRedirectHandler())
     with opener.open(request, timeout=30) as response:
         final_url = response.geturl()
         validated_upstream_url(final_url)

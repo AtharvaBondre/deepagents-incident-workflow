@@ -123,13 +123,13 @@ async function assertOsNetworkDisabled(): Promise<void> {
   if (failures.length > 0) throw new Error(failures.join("; "));
 }
 
-async function scriptedModel() {
+async function scriptedModel(options: { forbiddenTool?: string; commandTarget?: string } = {}) {
   const [{ AIMessage }, { fakeModel }] = await Promise.all([
     import("@langchain/core/messages"),
     import("@langchain/core/testing"),
   ]);
   const scripted = fakeModel();
-  const calls = [
+  const normalCalls = [
     {
       name: "write_file",
       id: "write-forbidden-smoke",
@@ -160,14 +160,88 @@ async function scriptedModel() {
       },
     },
   ];
-  for (const call of calls) scripted.respondWithTools([call]);
-  scripted.respond(new AIMessage("Candidate edit prepared; controller verification required."));
+  const forbiddenArguments: Record<string, JsonObject> = {
+    delete: { file_path: "/app/delete-canary.txt" },
+    execute: { command: `touch ${JSON.stringify(options.commandTarget ?? "/tmp/forbidden")}` },
+    task: { description: "forbidden synthetic subagent dispatch" },
+    write_todos: { todos: [] },
+  };
+  if (options.forbiddenTool !== undefined) {
+    const args = forbiddenArguments[options.forbiddenTool];
+    if (args === undefined) {
+      throw new Error(`unsupported forbidden tool probe: ${options.forbiddenTool}`);
+    }
+    scripted.respondWithTools([
+      {
+        name: options.forbiddenTool,
+        id: `forbidden-${options.forbiddenTool}-dispatch`,
+        args,
+      },
+    ]);
+    scripted.respond(new AIMessage("A forbidden dispatch unexpectedly returned."));
+  } else {
+    for (const call of normalCalls) scripted.respondWithTools([call]);
+    scripted.respond(new AIMessage("Candidate edit prepared; controller verification required."));
+  }
   Object.defineProperty(scripted, "getName", {
     configurable: false,
     value: () => "ChatOpenAI",
     writable: false,
   });
   return scripted;
+}
+
+function errorContains(value: unknown, expected: string, seen = new Set<unknown>()): boolean {
+  if (value === null || value === undefined || seen.has(value)) return false;
+  seen.add(value);
+  if (value instanceof Error && value.message.includes(expected)) return true;
+  if (!isObject(value)) return false;
+  if ("cause" in value && errorContains(value.cause, expected, seen)) return true;
+  if ("errors" in value && Array.isArray(value.errors)) {
+    return value.errors.some((item) => errorContains(item, expected, seen));
+  }
+  return false;
+}
+
+async function assertForbiddenDispatchRejected(options: {
+  worker: typeof import("./deepagents_worker.js");
+  workspace: string;
+  packet: JsonObject;
+}): Promise<boolean> {
+  const deleteCanary = path.join(options.workspace, "app", "delete-canary.txt");
+  const executeCanary = path.join(options.workspace, "app", "execute-canary.txt");
+  await fsPromises.writeFile(deleteCanary, "must-remain\n", "utf8");
+  for (const toolName of ["execute", "delete", "task", "write_todos"] as const) {
+    const model = await scriptedModel({ forbiddenTool: toolName, commandTarget: executeCanary });
+    const bounded = await options.worker.buildBoundedAgent({
+      model,
+      profileKey: "openai",
+      workspace: options.workspace,
+      packet: options.packet,
+    });
+    try {
+      await bounded.agent.invoke(
+        { messages: [{ role: "user", content: "Run the synthetic probe." }] },
+        { recursionLimit: 8 },
+      );
+    } catch (error: unknown) {
+      if (!errorContains(error, `forbidden tool call: ${toolName}`)) {
+        throw new Error(`${toolName} was not rejected by the controller dispatch boundary`, {
+          cause: error,
+        });
+      }
+      continue;
+    }
+    throw new Error(`forbidden tool call unexpectedly completed: ${toolName}`);
+  }
+  const executeChanged = await fsPromises
+    .lstat(executeCanary)
+    .then(() => true)
+    .catch(() => false);
+  if (executeChanged || (await fsPromises.readFile(deleteCanary, "utf8")) !== "must-remain\n") {
+    throw new Error("a forbidden tool dispatch changed the workspace");
+  }
+  return true;
 }
 
 export async function runSmoke(options: {
@@ -198,15 +272,21 @@ export async function runSmoke(options: {
     await fsPromises.mkdir(path.dirname(target), { recursive: true });
     await fsPromises.writeFile(target, "before\n", "utf8");
     await fsPromises.writeFile(outsideSecret, `${outsideCanary}\n`, "utf8");
+    const packet = {
+      schema_version: 1,
+      policy: { controller_is_sole_acceptor: true, allowed_paths: ["app/"] },
+    };
+    const forbiddenToolCallsRejected = await assertForbiddenDispatchRejected({
+      worker,
+      workspace,
+      packet,
+    });
     const model = await scriptedModel();
     const bounded = await worker.buildBoundedAgent({
       model,
       profileKey: "openai",
       workspace,
-      packet: {
-        schema_version: 1,
-        policy: { controller_is_sole_acceptor: true, allowed_paths: ["app/"] },
-      },
+      packet,
     });
     const result = await bounded.agent.invoke(
       { messages: [{ role: "user", content: "Apply the scripted edit." }] },
@@ -243,6 +323,7 @@ export async function runSmoke(options: {
       traversalReadDenied &&
       JSON.stringify(exactTools) === JSON.stringify([...worker.ALLOWED_TOOLS].sort()) &&
       forbiddenAbsent &&
+      forbiddenToolCallsRejected &&
       hasFinalResponse &&
       networkAttempts.length === 0;
     const record: JsonObject = {
@@ -259,6 +340,7 @@ export async function runSmoke(options: {
       network_attempts: networkAttempts.length,
       observed_tools: exactTools,
       forbidden_tools_absent: forbiddenAbsent,
+      forbidden_tool_calls_rejected: forbiddenToolCallsRejected,
       workspace_edit_succeeded: workspaceEditSucceeded,
       out_of_scope_write_denied: outOfScopeWriteDenied,
       traversal_write_denied: traversalWriteDenied,
