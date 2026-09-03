@@ -14,7 +14,7 @@
     "MPL-2.0 AND (Apache-2.0 OR MIT)",
     "PSF-2.0"
   ],
-  "captured_at": "2026-08-31T04:36:26+00:00",
+  "captured_at": "2026-09-03T04:17:53+00:00",
   "direct_pins": {
     "deepagents": "0.7.11",
     "langchain-anthropic": "1.7.0",
@@ -4733,8 +4733,8 @@
           "source": "https://docs.langchain.com/oss/python/deepagents/context-engineering.md"
         },
         "https://docs.langchain.com/oss/python/deepagents/customization.md": {
-          "bytes": 153282,
-          "sha256": "c09abceabcf4b1f42b046e83c5d7e1cf67a9438544f8a02edf71edac121d5230",
+          "bytes": 153617,
+          "sha256": "91fbc4af874cf9dd8b006831c84f3ce1ec118800d3cb9340e6f7b5fe1bf53fcd",
           "source": "https://docs.langchain.com/oss/python/deepagents/customization.md"
         },
         "https://docs.langchain.com/oss/python/deepagents/data-analysis.md": {
@@ -4818,13 +4818,13 @@
           "source": "https://docs.langchain.com/oss/python/deepagents/multimodal.md"
         },
         "https://docs.langchain.com/oss/python/deepagents/openwiki.md": {
-          "bytes": 4429,
-          "sha256": "7d11434d1462ec2df19e3826b7e6a9a7407c66f247dc039e52974a42919bd693",
+          "bytes": 4762,
+          "sha256": "d7d255915b554acf6dfe75769cf08e5988382c640f828daca42d757c54a8e2bf",
           "source": "https://docs.langchain.com/oss/python/deepagents/openwiki.md"
         },
         "https://docs.langchain.com/oss/python/deepagents/overview.md": {
-          "bytes": 79148,
-          "sha256": "249eecd6a3af465e3b9ea31eb079bac98ba8cc892e18bbd7471f5be95b229fdd",
+          "bytes": 79164,
+          "sha256": "463cd6e5433008c64e10179a1d1280e1e4c365acba300a7e6c44741bd5fbfade",
           "source": "https://docs.langchain.com/oss/python/deepagents/overview.md"
         },
         "https://docs.langchain.com/oss/python/deepagents/permissions.md": {
@@ -4863,8 +4863,8 @@
           "source": "https://docs.langchain.com/oss/python/deepagents/sandboxes.md"
         },
         "https://docs.langchain.com/oss/python/deepagents/skills.md": {
-          "bytes": 82174,
-          "sha256": "3b00669851fccb7ef9b8f881fee239bfb3f1eb20fa54cc5173c4ba9af9f3c541",
+          "bytes": 82727,
+          "sha256": "1c5a92f5d9459145e94ec81043c9e5fd1eefa2e4f400e5b012e28e7353a5bd2f",
           "source": "https://docs.langchain.com/oss/python/deepagents/skills.md"
         },
         "https://docs.langchain.com/oss/python/deepagents/streaming.md": {
@@ -4893,11 +4893,11 @@
     "pypi_latest": {
       "deepagents": {
         "artifact_sha256": [
-          "240e31cb60e4a8e3c4f9aa1ab706618bae4ea69ae6495d9fc0e3e773d551927e",
-          "7f8ca58b7aa8b11fb8a18d054aa5da937700cba221b1104b5eda4469e9531382"
+          "99fc1855b1387c1c6e6035ba3600edbd933f59c39a4863ef3a7d5a0272ea67ab",
+          "d717ee8ee092a91c475a6124ed578d5e4154d54120769a1081bfe1aece87c248"
         ],
-        "latest_upload": "2026-08-28T23:10:48.665479Z",
-        "version": "0.7.11"
+        "latest_upload": "2026-09-02T17:36:38.484452Z",
+        "version": "0.7.13"
       },
       "deepagents-code": {
         "artifact_sha256": [
@@ -4925,11 +4925,11 @@
       },
       "langchain-google-genai": {
         "artifact_sha256": [
-          "8a57f936b1fbde52776fdde6673fdabd99cfa5cbbb122a926f1cff0ba00f6bc6",
-          "8d4b1aa8f2c2e17b8e790d34a7e9a7b8e7d13e9a00175679d17647c235104bf9"
+          "7871beec56ac07b719f77c46997845db6ff2267b817bffb0f97877053b0895d7",
+          "8e23a1307bd2158590bbf9d99f1d658fc84a9d9ddb77fb1b372f8875a2bafbbf"
         ],
-        "latest_upload": "2026-08-27T20:44:05.203559Z",
-        "version": "4.3.7"
+        "latest_upload": "2026-09-01T20:15:45.816059Z",
+        "version": "4.4.0"
       },
       "langchain-ollama": {
         "artifact_sha256": [
@@ -4965,20 +4965,20 @@
       },
       "langsmith": {
         "artifact_sha256": [
-          "75258142d27dffcc5df331479704b23fc3fd812cfca0469119bb9055a842882f",
-          "927694c939c9fb44187e0126cf718413c45ffce2324d480438e70eb0526e1380"
+          "34574d4411947f62825e8368fd172cad2505ddfb73bf5d8ed7c0e7a41e4c4879",
+          "8916c1a8daa4282511f311f569fd5cb2f0aba8d89a4d1761620ed37b57f72c00"
         ],
-        "latest_upload": "2026-08-27T22:31:34.004628Z",
-        "version": "0.11.2"
+        "latest_upload": "2026-09-01T17:43:55.828465Z",
+        "version": "0.12.1"
       }
     },
     "source_paths": {
-      "langchain-ai/deepagents:libs/code": "a1af029e6e73cb17c36bff823d227747b28e91e1",
-      "langchain-ai/deepagents:libs/deepagents": "4bc11004ba86999c2f6d59b1d958b53195619bcc",
+      "langchain-ai/deepagents:libs/code": "673844d06fe0ee186f2e492c3c0a19ec5facffc2",
+      "langchain-ai/deepagents:libs/deepagents": "1aae3746682a65c837c5dd0f165b685253fe9465",
       "langchain-ai/docs:src/langsmith/data-storage-and-privacy.mdx": "d07ea9ec371e87dbb3806aa893b8378173a5b92e",
       "langchain-ai/docs:src/langsmith/trace-deep-agents.mdx": "020f9d555fb2917d8a2103b6d589f7d4bd4f4788",
-      "langchain-ai/docs:src/oss/deepagents": "5c7706189e32de742da92ee6c1be4c2beb817da3",
-      "langchain-ai/docs:src/oss/langgraph": "d353e7b3b8ca9ca00399d9c1dedf5b00d2d2cb82"
+      "langchain-ai/docs:src/oss/deepagents": "6d61aa91549eb4fc66f1bac23ff6a8bb23e8487d",
+      "langchain-ai/docs:src/oss/langgraph": "d6a781fa3c402432c3d7d9002a2316549bc60264"
     }
   }
 }

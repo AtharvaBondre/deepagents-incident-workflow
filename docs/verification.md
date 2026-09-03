@@ -174,6 +174,23 @@ cleanup. A component-level smoke cannot substitute for this composed proof.
 - Ruff 0.12.12 lint and format checks: passed.
 - `git diff --check`: passed.
 
+## Maintenance validation: 2026-09-03
+
+- `./scripts/run-local.sh test`: 153 controller and adversarial tests passed;
+  the two optional Python SDK-import tests skipped under the base interpreter as
+  designed.
+- Offline Python and TypeScript qualification, both network-isolated SDK
+  smokes, TypeScript type checking and worker tests, deterministic retry and
+  independent verification, the public-surface scan, and `git diff --check`
+  passed.
+- Current Python upstream evidence was refreshed without changing any direct
+  pin or transitive lock. TypeScript upstream drift remains review-only because
+  the latest LangSmith release is outside the peer range accepted by the pinned
+  Deep Agents SDK.
+- The current Trivy comparison remains fail-closed because several pinned base
+  images exceed their hash-bound vulnerability baselines. No baseline or image
+  digest was changed.
+
 ## Interpretation
 
 Passing these checks demonstrates the synthetic reference boundary on the tested host. It does not certify a model provider, Docker/kernel implementation, third-party sandbox, customer repository, live connector, or deployment system. Each such integration requires its own documented threat model and qualification evidence.

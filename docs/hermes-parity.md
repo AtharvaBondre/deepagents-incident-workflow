@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This project uses the public [Hermes Incident Workflow](https://github.com/AtharvaBondre/hermes-incident-workflow) as its reference product pattern. The comparison baseline is Hermes commit [`48cbf19bfc82305be8467607647ec14d4fc4192e`](https://github.com/AtharvaBondre/hermes-incident-workflow/commit/48cbf19bfc82305be8467607647ec14d4fc4192e).
+This project uses the public [Hermes Incident Workflow](https://github.com/AtharvaBondre/hermes-incident-workflow) as its reference product pattern. The comparison baseline is Hermes commit [`16209b66d1b6c6cbf30a71fc4b93a629147cbe89`](https://github.com/AtharvaBondre/hermes-incident-workflow/commit/16209b66d1b6c6cbf30a71fc4b93a629147cbe89).
 
 Hermes is a design reference, not a runtime dependency. This repository does not copy or vendor Hermes, its profile, bundled skills, plugins, assets, sessions, or dependency tree. Parity means preserving the same safety and product guarantees through native Deep Agents mechanisms.
 
@@ -43,7 +43,7 @@ Both projects must preserve these invariants:
 | Delivery | File-based draft GitHub and notification mocks | Equivalent mocks with post-eligibility revocation | Matched and strengthened |
 | Cleanup | Controller-owned container and Compose cleanup | Pre-launch intents, exact ownership checks, restart recovery, pre-delivery and closeout cleanup | Strengthened |
 | Public safety | Public-surface scanner and ignored artifacts | Expanded scanner, credential shapes, irregular-file checks, and git-aware ignored-path checks | Matched and strengthened |
-| Dependency integrity | External Hermes CLI version checked at preflight | Python hash locks plus npm integrity lock, provenance/license/source evidence, compiled TypeScript worker digest, scoped upstream drift, and network-none SDK smokes | Runtime-specific strengthening |
+| Dependency integrity | Exact Hermes version, source revision, clean tree, and packaging-file digests checked immediately before each attempt | Python hash locks plus npm integrity lock, provenance/license/source evidence, compiled TypeScript worker digest, scoped upstream drift, and network-none SDK smokes; full installed-runtime contents are not yet revalidated immediately before each attempt | Stronger supply-chain evidence, with a remaining runtime-revalidation gap |
 | CI | Deterministic tests and SDK smoke | Python 3.11/3.12 plus Node 22.23.2 matrices, pinned Ruff, direct graph smokes, and controller-to-worker end-to-end smokes | Matched and strengthened |
 | Customer adaptation | Public templates; private packs remain external | Equivalent customer-neutral templates and boundaries | Matched |
 | Costing | Evidence-backed model-cost guidance | Equivalent formulas and provider-rate structure | Matched |
@@ -108,6 +108,14 @@ Do not make CI fetch or execute the Hermes repository. Cross-project review is a
 
 ## Current conclusion
 
-Against the pinned public Hermes baseline, the Deep Agents project has feature parity for the safe synthetic incident-remediation workflow and broader fail-closed verifier, patch-integrity, cleanup-recovery, and public-surface regression coverage. Features outside that bounded workflow remain deliberately unsupported unless their security and operating requirements are separately specified and tested.
+Against the pinned public Hermes baseline, the Deep Agents project has feature
+parity for the safe synthetic incident-remediation workflow and broader
+fail-closed verifier, patch-integrity, cleanup-recovery, and public-surface
+regression coverage. It does not yet claim parity with Hermes' immediate
+pre-attempt validation of the complete external runtime contents; closing that
+gap requires a separately reviewed runtime-integrity design for both Python and
+TypeScript installations. Features outside the bounded workflow remain
+deliberately unsupported unless their security and operating requirements are
+separately specified and tested.
 
 The composed no-cost SDK qualification also proves that this conclusion is not based only on unit-level equivalence: an actual Deep Agents graph and worker subprocess can produce a candidate that survives the complete controller-owned acceptance chain without receiving delivery authority.
